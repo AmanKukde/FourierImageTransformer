@@ -1,2 +1,2 @@
-from .TRecTransformerModule import TRecTransformerModule
+# from .TRecTransformerModule import TRecTransformerModule
 from .SResTransformerModule import SResTransformerModule

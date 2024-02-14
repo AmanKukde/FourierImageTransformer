@@ -1,3 +1,11 @@
+import sys
+sys.path.append('./')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit/utils')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit/transformers')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/fit/datamodules')
+# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/fit/datamodules/super_res')
 import numpy as np
 import torch
 import torch.fft

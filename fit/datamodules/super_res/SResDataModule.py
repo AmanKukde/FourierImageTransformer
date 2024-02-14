@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+sys.path.append('./')
 from os.path import join, exists
 from typing import Optional, Union, List
 
@@ -42,19 +45,19 @@ class SResFITDataModule(LightningDataModule):
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=1)
+            batch_size=self.batch_size, num_workers=4)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=1)
+            batch_size=self.batch_size, num_workers=4)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size)
+            batch_size=self.batch_size,num_workers=4)
 
 
 class MNIST_SResFITDM(SResFITDataModule):
@@ -79,6 +82,8 @@ class MNIST_SResFITDM(SResFITDataModule):
         perm = np.random.permutation(mnist_train_val.shape[0])
         mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
         mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
+        # mnist_train = mnist_train_val[perm[:550], 1:, 1:]
+        # mnist_val = mnist_train_val[perm[550:600], 1:, 1:]
         mnist_test = mnist_test[:, 1:, 1:]
 
         self.mean = mnist_train.mean()
