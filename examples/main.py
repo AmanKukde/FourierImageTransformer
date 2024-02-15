@@ -48,7 +48,7 @@ model = SResTransformerModule(d_model=n_heads*d_query,
 # Train your own model.
 name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all")
-trainer = Trainer(max_epochs=2,logger=wandb_logger,
+trainer = Trainer(max_epochs=100,logger=wandb_logger,
                   enable_checkpointing=True,default_root_dir = f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}', 
                                             callbacks=ModelCheckpoint(
                                             dirpath=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',
