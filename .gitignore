@@ -150,3 +150,8 @@ lightning_logs
 
 # model ipynb_checkpoints
 *.ckpt
+*.png
+*.ipynb
+*.gitkeep
+*.gitignore
+*.json

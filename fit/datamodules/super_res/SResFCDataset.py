@@ -1,11 +1,5 @@
 import sys
 sys.path.append('./')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit/utils')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/ORIGINAL_FIT/FourierImageTransformer/fit/transformers')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/fit/datamodules')
-# sys.path.append('/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/fit/datamodules/super_res')
 import numpy as np
 import torch
 import torch.fft
@@ -19,7 +13,7 @@ class SResFourierCoefficientDataset(Dataset):
         self.ds = ds
         if amp_min == None and amp_max == None:
             tmp_imgs = []
-            for i in np.random.permutation(len(self.ds))[:200]:
+            for i in np.random.permutation(len(self.ds))[:2000]:
                 img = self.ds[i]
                 tmp_imgs.append(img)
 
@@ -35,7 +29,7 @@ class SResFourierCoefficientDataset(Dataset):
     def __getitem__(self, item):
         img = self.ds[item]
         img_fft = torch.fft.rfftn(img, dim=[0, 1])
-
+        
         img_amp, img_phi = normalize_FC(img_fft, amp_min=self.amp_min, amp_max=self.amp_max)
 
         img_fft = torch.stack([img_amp.flatten(), img_phi.flatten()], dim=-1)
