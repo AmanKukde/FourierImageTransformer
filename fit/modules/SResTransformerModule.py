@@ -25,7 +25,7 @@ class SResTransformerModule(LightningModule):
                  mode='train',
                  lr=0.0001,
                  weight_decay=0.01,\
-                 n_layers=4, n_heads=4, d_query=4, dropout=0.1, attention_dropout=0.1,num_shells=4):
+                 n_layers=4, n_heads=4, d_query=4, dropout=0.1, attention_dropout=0.1,num_shells=4,model_path = None):
         super().__init__()
         self.outputs = []
         self.save_hyperparameters("d_model",
@@ -38,7 +38,7 @@ class SResTransformerModule(LightningModule):
                                   "d_query",
                                   "dropout",
                                   "attention_dropout",
-                                  "num_shells")
+                                  "num_shells",)
 
         self.coords = coords
         self.dst_flatten_order = dst_flatten_order
@@ -49,7 +49,7 @@ class SResTransformerModule(LightningModule):
         self.d_query = d_query
         self.mode = mode
         self.shells = num_shells
-    
+        self.model_path = model_path
         
 
         # self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
@@ -166,7 +166,8 @@ class SResTransformerModule(LightningModule):
     
     def test_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        self.load_test_model(path = self.trainer.checkpoint_callback.last_model_path)
+        model_path = self.model_path or self.trainer.checkpoint_callback.last_model_path
+        self.load_test_model(path = model_path)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
 
         lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
@@ -178,6 +179,11 @@ class SResTransformerModule(LightningModule):
         pred_psnr = [PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
                      range(gt_img.shape[0])]
         self.test_outputs = (lowres_psnr, pred_psnr)
+        for i in range(len(lowres_img)):
+            self.logger.experiment.log({f"Test/input_image":[wandb.Image(lowres_img[i].cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
+            self.logger.experiment.log({f"Test/pred_image":[wandb.Image(pred_img[i].cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
+            self.logger.experiment.log({f"Test/gt_image":[wandb.Image(gt_img[i].cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
+
         return self.test_outputs
 
 

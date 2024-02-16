@@ -42,7 +42,8 @@ model = SResTransformerModule(d_model=n_heads*d_query,
                               dst_order=order,
                               loss='sum',
                               lr=0.0001, weight_decay=0.01, n_layers=8,
-                              n_heads=n_heads, d_query=d_query, dropout=0.1, attention_dropout=0.1,num_shells =5)
+                              n_heads=n_heads, d_query=d_query, dropout=0.1, attention_dropout=0.1,num_shells =5,
+                              model_path ='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/15-02_17-37-42/epoch=52-step=91107.ckpt')
 
 
 # Train your own model.
@@ -59,8 +60,8 @@ trainer = Trainer(max_epochs=100,logger=wandb_logger,
                                             # mode='min'),limit_train_batches= 0.1,fast_dev_run=True)
                                             mode='min'))#,limit_train_batches= 0.1,fast_dev_run=True)
 
-trainer.fit(model, datamodule=dm)
-trainer.validate(model, datamodule=dm)
+# trainer.fit(model, datamodule=dm)
+# trainer.validate(model, datamodule=dm)
 trainer.test(model, datamodule=dm)
 
 # model.load_test_model('/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/12-02_16-12/last.ckpt')
