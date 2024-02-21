@@ -27,43 +27,55 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer",default = 8)
     parser.add_argument("--lr", type=float, help="Learning rate",default = 0.0001)
-    parser.add_argument("--n_shells", type=int, help="Number of shells used as lowres input in the transformer",default = 4)
+    parser.add_argument("--n_shells", type=int, help="Number of shells used as lowres input in the transformer",default = 8)
     parser.add_argument("--model", type=str, help="Model to be used in the transformer",default = '')
     parser.add_argument("--dataset", type=str, help="Dataset to be used",default = 'MNIST')
+    parser.add_argument("--n_heads", type=int, help="No of heads in model",default = 8)
+    parser.add_argument("--loss", type=str, help="loss",default = 'sum_modified')
+    parser.add_argument("--d_query", type=int, help="d_query",default = 32)
+    parser.add_argument("--subset_flag", type=bool,default = False)
+    
+    
     args = parser.parse_args()
     n_layers = args.n_layers
     lr = args.lr
-    n_shells = args.num_shells
+    n_shells = args.n_shells
+    n_heads = args.n_heads
     model = args.model
     dataset = args.dataset
+    loss = args.loss
+    d_query = args.d_query
+    subset_flag = args.subset_flag
+    
     if dataset == 'MNIST':
         dm = MNIST_SResFITDM(root_dir='./datamodules/data/', batch_size=32)
-        dm.prepare_data()
-        dm.setup()
     else:
         dm = CelebA_SResFITDM(root_dir='examples/datamodules/data/CelebA', batch_size = 8); lr = 0.00001
-        dm.prepare_data()
-        dm.setup()
+    
+    dm.prepare_data()
+    dm.setup()
 
     
 
     r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
 
-    n_heads = 8
-    d_query = 32
+    
 
-    model = SResTransformerModule(d_model=n_heads*d_query, 
+    model = SResTransformerModule(d_model=n_heads*d_query,
+                                n_heads=n_heads, d_query=d_query, 
                                 img_shape=dm.gt_shape,
                                 coords=(r, phi),
                                 dst_flatten_order=flatten_order,
                                 dst_order=order,
-                                loss='sum',
+                                loss='prod',
                                 lr=lr, weight_decay=0.01, n_layers=n_layers,
-                                n_heads=n_heads, d_query=d_query, dropout=0.1, attention_dropout=0.1,num_shells =n_shells,model = model)
+                                dropout=0.1, attention_dropout=0.1, num_shells =n_shells,model_path = model)
 
     # Train your own model.
-    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
+
+    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") +f"_{loss}_subset_{subset_flag}"
     wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all")
+    
     trainer = Trainer(max_epochs=100,logger=wandb_logger,
                     enable_checkpointing=True,default_root_dir = f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}', 
                                                 callbacks=ModelCheckpoint(
@@ -71,7 +83,7 @@ if __name__ == '__main__':
                                                 save_top_k=1,
                                                 verbose=False,
                                                 save_last=True,
-                                                monitor='Validation/avg_val_loss',
+                                                monitor='val_lowres_vs_pred_psnr',
                                                 mode='min'))
 
     trainer.fit(model, datamodule=dm)

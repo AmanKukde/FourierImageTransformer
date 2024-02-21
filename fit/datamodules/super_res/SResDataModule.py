@@ -41,23 +41,22 @@ class SResFITDataModule(LightningDataModule):
         self.mag_min = tmp_fcds.amp_min
         self.mag_max = tmp_fcds.amp_max
 
+
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+            batch_size=self.batch_size, num_workers=3)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+        return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max), batch_size=self.batch_size, num_workers=3)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size,num_workers=0)
+            batch_size=self.batch_size,num_workers=3)
 
 
 class MNIST_SResFITDM(SResFITDataModule):
@@ -75,16 +74,16 @@ class MNIST_SResFITDM(SResFITDataModule):
         """
         super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=27)
 
-    def prepare_data(self, *args, **kwargs):
+    def prepare_data(self,*args, **kwargs):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
         np.random.seed(1612)
         perm = np.random.permutation(mnist_train_val.shape[0])
         mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
         mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
-
-        # mnist_train = mnist_train_val[perm[:550], 1:, 1:]
-        # mnist_val = mnist_train_val[perm[550:600], 1:, 1:]
+       
+        # mnist_train = mnist_train_val[perm[:5500], 1:, 1:]
+        # mnist_val = mnist_train_val[perm[5500:6000], 1:, 1:]
         
         mnist_test = mnist_test[:, 1:, 1:]
 

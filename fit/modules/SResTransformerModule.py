@@ -3,7 +3,7 @@ from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
-from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified
+from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
 from fit.transformers.SResTransformer import SResTransformerTrain, SResTransformerPredict
 from fit.utils import denormalize_FC, PSNR, convert2DFT
 from fit.utils.RAdam import RAdam
@@ -38,7 +38,7 @@ class SResTransformerModule(LightningModule):
                                   "d_query",
                                   "dropout",
                                   "attention_dropout",
-                                  "num_shells",)
+                                  "num_shells")
 
         self.coords = coords
         self.dst_flatten_order = dst_flatten_order
@@ -50,20 +50,24 @@ class SResTransformerModule(LightningModule):
         self.mode = mode
         self.shells = num_shells
         self.model_path = model_path
+        self.n_layers = n_layers
         
 
         # self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
 
         if loss == 'prod':
-            self.loss = _fc_prod_loss
-        else:
-            # self.loss = _fc_sum_loss
+            self.loss = _fc_prod_loss_modified
+        elif loss == 'sum':
+            self.loss = _fc_sum_loss
+        elif loss == 'prod_modified':
+            self.loss = _fc_prod_loss_modified
+        elif loss == 'sum_modified':
             self.loss = _fc_sum_loss_modified
 
         self.sres = SResTransformerTrain(d_model=self.d_model,
                                          coords=self.coords,
                                          flatten_order=self.dst_flatten_order,
-                                         n_layers=8,
+                                         n_layers=self.n_layers,
                                          n_heads=self.n_heads,
                                          d_query=self.d_query,
                                          dropout= 0.1,
@@ -199,7 +203,7 @@ class SResTransformerModule(LightningModule):
     def convert2img(self, fc, mag_min, mag_max):
         dft = convert2DFT(x=fc, amp_min=mag_min, amp_max=mag_max, dst_flatten_order=self.dst_flatten_order,
                           img_shape=self.hparams.img_shape)
-        return torch.fft.irfftn(dft, s=2 * (self.hparams.img_shape,), dim=[1, 2])
+        return torch.fft.irfftn(dft, s = 2 * (self.hparams.img_shape,), dim=[1,2])
 
     def get_lowres_pred_gt(self, fc, mag_min, mag_max):
         x_fc = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
@@ -216,7 +220,7 @@ class SResTransformerModule(LightningModule):
         self.sres_pred = SResTransformerPredict(d_model=self.d_model,
                                          coords=self.coords,
                                          flatten_order=self.dst_flatten_order,
-                                         n_layers=8,
+                                         n_layers=self.n_layers,
                                          n_heads=self.n_heads,
                                          d_query=self.d_query,
                                          dropout= 0.1,
@@ -232,19 +236,19 @@ class SResTransformerModule(LightningModule):
         self.sres_pred.to(self.device)
 
     def predict_with_recurrent(self, fcs, n, seq_len):
-        memory = None
+        state = None
         y_hat = []
         x_hat = []
         
         with torch.no_grad():
             for i in range(n):
                 x_hat.append(fcs[:, i])
-                yi, memory = self.sres_pred(x_hat[-1], i=i, memory=memory)
+                yi, state = self.sres_pred(x_hat[-1], i=i, state=state)
                 y_hat.append(yi)
 
             for i in range(n, seq_len - 1):
                 x_hat.append(y_hat[-1])
-                yi, memory = self.sres_pred(x_hat[-1], i=i, memory=memory)
+                yi, state = self.sres_pred(x_hat[-1], i=i, state=state)
                 y_hat.append(yi)
 
             x_hat.append(y_hat[-1])
