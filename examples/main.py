@@ -13,6 +13,7 @@ import datetime
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
+import wandb
 import matplotlib.gridspec as gridspec
 from os.path import exists
 import wget
@@ -27,13 +28,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer",default = 8)
     parser.add_argument("--lr", type=float, help="Learning rate",default = 0.0001)
-    parser.add_argument("--n_shells", type=int, help="Number of shells used as lowres input in the transformer",default = 8)
+    parser.add_argument("--n_shells", type=int, help="Number of shells used as lowres input in the transformer",default = 4)
     parser.add_argument("--model", type=str, help="Model to be used in the transformer",default = '')
     parser.add_argument("--dataset", type=str, help="Dataset to be used",default = 'MNIST')
     parser.add_argument("--n_heads", type=int, help="No of heads in model",default = 8)
     parser.add_argument("--loss", type=str, help="loss",default = 'sum_modified')
     parser.add_argument("--d_query", type=int, help="d_query",default = 32)
-    parser.add_argument("--subset_flag", type=bool,default = False)
+    parser.add_argument("--subset_flag", type=bool,default = True)
     
     
     args = parser.parse_args()
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     else:
         dm = CelebA_SResFITDM(root_dir='examples/datamodules/data/CelebA', batch_size = 8); lr = 0.00001
     
-    dm.prepare_data()
+    dm.prepare_data(subset_flag = subset_flag)
     dm.setup()
 
     
@@ -67,16 +68,16 @@ if __name__ == '__main__':
                                 coords=(r, phi),
                                 dst_flatten_order=flatten_order,
                                 dst_order=order,
-                                loss='prod',
+                                loss=loss,
                                 lr=lr, weight_decay=0.01, n_layers=n_layers,
                                 dropout=0.1, attention_dropout=0.1, num_shells =n_shells,model_path = model)
 
     # Train your own model.
 
-    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") +f"_{loss}_subset_{subset_flag}"
-    wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all")
+    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") +f"_{loss}"
+    wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
     
-    trainer = Trainer(max_epochs=100,logger=wandb_logger,
+    trainer = Trainer(max_epochs=300,logger=wandb_logger,
                     enable_checkpointing=True,default_root_dir = f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}', 
                                                 callbacks=ModelCheckpoint(
                                                 dirpath=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',

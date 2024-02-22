@@ -1,8 +1,4 @@
-import torch
-from torch.nn import Dropout, Linear, Module
-from fit.transformers.events import EventDispatcher, QKVEvent
-
-
+# This file is a copy of the original file from the fast-transformers library
 """Implement the full attention similar to the one implemented by PyTorch's
 MultiHeadAttention module. Note that this module is to be used in conjuction
 with the `fast_transformers.attention.attention_layer.AttentionLayer` in order
@@ -11,8 +7,7 @@ to work."""
 from math import sqrt
 
 import torch
-from torch.nn import Dropout, Module
-from fit.transformers.events import EventDispatcher, AttentionEvent
+from torch.nn import Dropout, Linear, Module
 
 class AttentionLayer(Module):
     """Implement the attention layer. Namely project the inputs to multi-head
@@ -52,7 +47,6 @@ class AttentionLayer(Module):
         self.value_projection = Linear(d_model_keys, d_values * n_heads)
         self.out_projection = Linear(d_values * n_heads, d_model)
         self.n_heads = n_heads
-        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, queries, keys, values, attn_mask, query_lengths,
                 key_lengths):
@@ -94,8 +88,6 @@ class AttentionLayer(Module):
         keys = self.key_projection(keys).view(N, S, H, -1)
         values = self.value_projection(values).view(N, S, H, -1)
 
-        # Let the world know of the qkv
-        self.event_dispatcher.dispatch(QKVEvent(self, queries, keys, values))
 
         # Compute the attention
         new_values = self.inner_attention(
@@ -129,7 +121,6 @@ class FullAttention(Module):
         super(FullAttention, self).__init__()
         self.softmax_temp = softmax_temp
         self.dropout = Dropout(attention_dropout)
-        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, queries, keys, values, attn_mask, query_lengths,
                 key_lengths):
@@ -167,8 +158,6 @@ class FullAttention(Module):
         A = self.dropout(torch.softmax(QK, dim=-1))
         V = torch.einsum("nhls,nshd->nlhd", A, values)
 
-        # Let the world know of the attention matrix
-        self.event_dispatcher.dispatch(AttentionEvent(self, A))
 
         # Make sure that what we return is contiguous
         return V.contiguous()

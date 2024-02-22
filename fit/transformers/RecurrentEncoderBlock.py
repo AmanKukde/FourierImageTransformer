@@ -2,8 +2,9 @@ import warnings
 import torch
 import torch.nn.functional as F
 from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList
-from fit.transformers.events import EventDispatcher, IntermediateOutput
-from fit.transformers.RecurrentAttention import RecurrentFullAttention,RecurrentAttentionLayer
+# from fit.transformers.Attention.CausalLinearAttention import CausalLinearAttention
+from fit.transformers.Attention.RecurrentLinearAttention import RecurrentLinearAttention
+from fit.transformers.Attention.RecurrentAttention import RecurrentFullAttention,RecurrentAttentionLayer
 # from utils import check_state
 
 
@@ -36,7 +37,6 @@ class RecurrentTransformerEncoderLayer(Module):
         self.norm2 = LayerNorm(d_model)
         self.dropout = Dropout(dropout)
         self.activation = F.relu if activation == "relu" else F.gelu
-        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, x, state=None):
         """Apply the transformer encoder to the input x using the provided
@@ -85,7 +85,6 @@ class RecurrentTransformerEncoder(Module):
         super(RecurrentTransformerEncoder, self).__init__()
         self.layers = ModuleList(layers)
         self.norm = norm_layer
-        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, x, state=None):
         """Apply all recurrent transformer layers to the input x using the
@@ -106,7 +105,6 @@ class RecurrentTransformerEncoder(Module):
         for i, layer in enumerate(self.layers):
             x, s = layer(x, state[i])
             state[i] = s
-            self.event_dispatcher.dispatch(IntermediateOutput(self, x))
 
         # Apply the normalization if needed
         if self.norm is not None:

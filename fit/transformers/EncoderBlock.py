@@ -4,8 +4,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.nn import Dropout, LayerNorm, Linear, Module, ModuleList
 from fit.transformers.masking import LengthMask,FullMask
-from fit.transformers.events import EventDispatcher, QKVEvent
-from fit.transformers.Attention import AttentionLayer,FullAttention
+from fit.transformers.Attention.Attention import AttentionLayer,FullAttention
+from fit.transformers.Attention.LinearAttention import LinearAttention
+# from fit.transformers.Attention.CausalLinearAttention import CausalLinearAttention
+
 
 class TransformerEncoderLayer(Module):
     """Self attention and feed forward network with skip connections.
@@ -39,7 +41,6 @@ class TransformerEncoderLayer(Module):
         self.norm2 = LayerNorm(d_model)
         self.dropout = Dropout(dropout)
         self.activation = getattr(F, activation)
-        self.event_dispatcher = EventDispatcher.get(event_dispatcher)
 
     def forward(self, x, attn_mask=None, length_mask=None):
         """Apply the transformer encoder to the input x.

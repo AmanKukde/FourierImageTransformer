@@ -25,7 +25,7 @@ class SResTransformerModule(LightningModule):
                  mode='train',
                  lr=0.0001,
                  weight_decay=0.01,\
-                 n_layers=4, n_heads=4, d_query=4, dropout=0.1, attention_dropout=0.1,num_shells=4,model_path = None):
+                 n_layers=4, n_heads=4, d_query=32, dropout=0.1, attention_dropout=0.1,num_shells=4,model_path = None):
         super().__init__()
         self.outputs = []
         self.save_hyperparameters("d_model",
@@ -56,7 +56,7 @@ class SResTransformerModule(LightningModule):
         # self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
 
         if loss == 'prod':
-            self.loss = _fc_prod_loss_modified
+            self.loss = _fc_prod_loss
         elif loss == 'sum':
             self.loss = _fc_sum_loss
         elif loss == 'prod_modified':
@@ -232,6 +232,7 @@ class SResTransformerModule(LightningModule):
                 if k[:5] == 'sres.':
                     sd[k[5:]] = weights['state_dict'][k]
             self.sres_pred.load_state_dict(sd)
+            print("weights loaded successfully")
 
         self.sres_pred.to(self.device)
 
