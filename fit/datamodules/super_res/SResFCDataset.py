@@ -9,10 +9,27 @@ from fit.utils.utils import normalize_FC, log_amplitudes
 
 
 class SResFourierCoefficientDataset(Dataset):
-    def __init__(self, ds, amp_min, amp_max):
+    # def __init__(self, ds, amp_min, amp_max):
+    #     self.ds = ds
+        
+    #     if amp_min == None and amp_max == None:
+    #         tmp_imgs = []
+    #         for i in np.random.permutation(len(self.ds))[:2000]:
+    #             img = self.ds[i]
+    #             tmp_imgs.append(img)
+
+    #         tmp_imgs = torch.stack(tmp_imgs)
+    #         tmp_ffts = torch.fft.rfftn(tmp_imgs, dim=[1, 2])
+    #         log_amps = log_amplitudes(tmp_ffts.abs())
+    #         self.amp_min = log_amps.min()
+    #         self.amp_max = log_amps.max()
+    #     else:
+    #         self.amp_min = amp_min
+    #         self.amp_max = amp_max
+    def __init__(self, ds, amp_mean, amp_std):
         self.ds = ds
         
-        if amp_min == None and amp_max == None:
+        if amp_mean == None and amp_std == None:
             tmp_imgs = []
             for i in np.random.permutation(len(self.ds))[:2000]:
                 img = self.ds[i]
@@ -21,11 +38,11 @@ class SResFourierCoefficientDataset(Dataset):
             tmp_imgs = torch.stack(tmp_imgs)
             tmp_ffts = torch.fft.rfftn(tmp_imgs, dim=[1, 2])
             log_amps = log_amplitudes(tmp_ffts.abs())
-            self.amp_min = log_amps.min()
-            self.amp_max = log_amps.max()
+            self.amp_mean = torch.mean(log_amps)
+            self.amp_std = log_amps.std()
         else:
-            self.amp_min = amp_min
-            self.amp_max = amp_max
+            self.amp_mean = amp_mean
+            self.amp_std = amp_std
 
     def __getitem__(self, item):
         img = self.ds[item]

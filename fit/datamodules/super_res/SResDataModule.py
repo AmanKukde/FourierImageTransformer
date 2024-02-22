@@ -39,7 +39,8 @@ class SResFITDataModule(LightningDataModule):
         tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=None,
                                                  amp_max=None)
         self.mag_min = tmp_fcds.amp_min
-        self.mag_max = tmp_fcds.amp_max
+        self.mag_min = tmp_fcds.amp_min
+
 
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
@@ -86,6 +87,7 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_val = mnist_train_val[0, 1:, 1:]
         mnist_train = torch.tile(mnist_train, (32,1,1))
         mnist_val = torch.tile(mnist_val, (32,1,1))
+        
         mnist_test = mnist_test[:, 1:, 1:]
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
