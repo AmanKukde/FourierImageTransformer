@@ -30,8 +30,6 @@ class SResFITDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.gt_shape = gt_shape
         self.gt_ds = None
-        self.mean = None
-        self.std = None
         self.mag_min = None
         self.mag_max = None
 
@@ -39,9 +37,7 @@ class SResFITDataModule(LightningDataModule):
         tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=None,
                                                  amp_max=None)
         self.mag_min = tmp_fcds.amp_min
-        self.mag_min = tmp_fcds.amp_min
-
-
+        self.mag_max = tmp_fcds.amp_max
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
@@ -58,7 +54,6 @@ class SResFITDataModule(LightningDataModule):
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
             batch_size=self.batch_size,num_workers=3)
-
 
 class MNIST_SResFITDM(SResFITDataModule):
 
