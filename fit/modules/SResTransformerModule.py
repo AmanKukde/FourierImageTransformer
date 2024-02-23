@@ -11,11 +11,7 @@ import wandb
 import numpy as np
 
 import torch.fft
-
-
-
 from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
-from pytorch_lightning.loggers import TensorBoardLogger
 
 
 class SResTransformerModule(LightningModule):
