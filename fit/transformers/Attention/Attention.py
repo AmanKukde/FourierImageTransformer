@@ -37,16 +37,16 @@ class AttentionLayer(Module):
         super(AttentionLayer, self).__init__()
 
         # Fill d_keys and d_values
-        d_keys = d_keys or (d_model//n_heads)
-        d_values = d_values or (d_model//n_heads)
+        d_keys = d_keys or (d_model//n_heads) #32
+        d_values = d_values or (d_model//n_heads) #32
         d_model_keys = d_model_keys or d_model
 
         self.inner_attention = attention
-        self.query_projection = Linear(d_model, d_keys * n_heads)
-        self.key_projection = Linear(d_model_keys, d_keys * n_heads)
-        self.value_projection = Linear(d_model_keys, d_values * n_heads)
-        self.out_projection = Linear(d_values * n_heads, d_model)
-        self.n_heads = n_heads
+        self.query_projection = Linear(d_model, d_keys * n_heads) #256 --> 256
+        self.key_projection = Linear(d_model_keys, d_keys * n_heads) #256 --> 256
+        self.value_projection = Linear(d_model_keys, d_values * n_heads) #256 --> 256
+        self.out_projection = Linear(d_values * n_heads, d_model) #256 --> 256
+        self.n_heads = n_heads #8
 
     def forward(self, queries, keys, values, attn_mask, query_lengths,
                 key_lengths):
@@ -138,16 +138,17 @@ class FullAttention(Module):
             key_lengths: An implementation of BaseMask that encodes how
                          many queries each sequence in the batch consists of
         """
-        # Extract some shapes and compute the temperature
+        ## Extract some shapes and compute the temperature
         N, L, H, E = queries.shape
         _, S, _, D = values.shape
-        softmax_temp = self.softmax_temp or 1./sqrt(E)
+        # softmax_temp = self.softmax_temp or 1./sqrt(E)
 
-        # Scale the queries instead of applying the softmax temperature to the
-        # dot products
-        queries = queries * softmax_temp
+        ##Scale the queries instead of applying the softmax temperature to the
+        ##dot products
 
-        # Compute the unnormalized attention and apply the masks
+        # queries = queries * softmax_temp
+        
+        ## Compute the unnormalized attention and apply the masks
         QK = torch.einsum("nlhe,nshe->nhls", queries, keys)
         if not attn_mask.all_ones:
             QK = QK + attn_mask.additive_matrix

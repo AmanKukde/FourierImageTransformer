@@ -21,7 +21,7 @@ class SResTransformerModule(LightningModule):
                  mode='train',
                  lr=0.0001,
                  weight_decay=0.01,\
-                 n_layers=4, n_heads=4, d_query=32, dropout=0.1, attention_dropout=0.1,num_shells=4,model_path = None):
+                 n_layers=4, n_heads=4, d_query=32, dropout=0.1, attention_dropout=0.1,num_shells=4,model_path = None,saved_model_path = None):
         super().__init__()
         self.outputs = []
         self.save_hyperparameters("d_model",
@@ -46,10 +46,11 @@ class SResTransformerModule(LightningModule):
         self.mode = mode
         self.shells = num_shells
         self.model_path = model_path
+        self.saved_model_path = saved_model_path
         self.n_layers = n_layers
         
 
-        # self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
+        # #self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
 
         if loss == 'prod':
             self.loss = _fc_prod_loss
@@ -68,6 +69,16 @@ class SResTransformerModule(LightningModule):
                                          d_query=self.d_query,
                                          dropout= 0.1,
                                          attention_dropout=0.1)
+        if len(self.model_path) > 0:
+            weights = torch.load(self.model_path)
+            sd = {}
+            for k in weights['state_dict'].keys():
+                if k[:5] == 'sres.':
+                    sd[k[5:]] = weights['state_dict'][k]
+            self.sres.load_state_dict(sd)
+            self.sres.to(self.device)
+            
+            print("weights loaded to train model successfully")
 
         # self.sres_pred = None
         x, y = np.meshgrid(range(self.dft_shape[1]), range(-self.dft_shape[0] // 2, self.dft_shape[0] // 2 + 1))
@@ -101,7 +112,7 @@ class SResTransformerModule(LightningModule):
 
         fc_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
-        self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
+        #self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
         
         return {'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss}
     
@@ -109,9 +120,9 @@ class SResTransformerModule(LightningModule):
         loss = torch.mean(torch.tensor([x['loss'] for x in self.outputs]))
         amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
         phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
-        self.log('Train/train_loss', loss, logger=True, on_epoch=True)
-        self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
-        self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
+        #self.log('Train/train_loss', loss, logger=True, on_epoch=True)
+        #self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
+        #self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
         self.outputs = []
         
 
@@ -123,8 +134,8 @@ class SResTransformerModule(LightningModule):
         pred = self.sres.forward(x_fc)
 
         val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
-        if batch_idx == 0:
-            self.log_val_images(fc, mag_min, mag_max)
+        #if batch_idx == 0:
+            #self.log_val_images(fc, mag_min, mag_max)
         
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
         lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
@@ -140,7 +151,7 @@ class SResTransformerModule(LightningModule):
         
         
         self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss, 'val_lowres_psnr': lowres_vs_gt_psnr, 'val_pred_psnr': pred_vs_gt_psnr, 'val_lowres_vs_pred_psnr': low_res_vs_pred_psnr}
-        self.log_dict(self.val_outputs)
+        #self.log_dict(self.val_outputs)
         return self.val_outputs
 
     def log_val_images(self, fc, mag_min, mag_max):
@@ -151,22 +162,22 @@ class SResTransformerModule(LightningModule):
             pred_ = torch.clamp((pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0, 1)
             gt_ = torch.clamp((gt[i].unsqueeze(0) - gt.min()) / (gt.max() - gt.min()), 0, 1)
 
-            self.logger.experiment.log({f"Validation_Images/val_input_image":[wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
-            self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
-            self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
+            #self.logger.experiment.log({f"Validation_Images/val_input_image":[wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
+            #self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
+            #self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
 
     def on_validation_epoch_end(self):
         val_loss = self.val_outputs['val_loss']
         amp_loss = self.val_outputs['val_amp_loss']
         phi_loss = self.val_outputs['val_phi_loss']
 
-        self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
-        self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
-        self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
+        #self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
+        #self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
+        #self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
     
     def test_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        model_path = self.model_path or self.trainer.checkpoint_callback.last_model_path
+        model_path = self.saved_model_path or self.trainer.checkpoint_callback.last_model_path
         self.load_test_model(path = model_path)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
 
@@ -179,10 +190,10 @@ class SResTransformerModule(LightningModule):
         pred_psnr = [PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
                      range(gt_img.shape[0])]
         self.test_outputs = (lowres_psnr, pred_psnr)
-        for i in range(len(lowres_img)):
-            self.logger.experiment.log({f"Test/input_image":[wandb.Image(lowres_img[i].cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
-            self.logger.experiment.log({f"Test/pred_image":[wandb.Image(pred_img[i].cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
-            self.logger.experiment.log({f"Test/gt_image":[wandb.Image(gt_img[i].cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
+        #for i in range(len(lowres_img)):
+            #self.logger.experiment.log({f"Test/input_image":[wandb.Image(lowres_img[i].cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
+            #self.logger.experiment.log({f"Test/pred_image":[wandb.Image(pred_img[i].cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
+            #self.logger.experiment.log({f"Test/gt_image":[wandb.Image(gt_img[i].cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
 
         return self.test_outputs
 
@@ -191,10 +202,10 @@ class SResTransformerModule(LightningModule):
         
         lowres_psnrs = torch.stack(self.test_outputs[0])
         pred_psnrs = torch.stack(self.test_outputs[1])
-        self.log('Test/Input Mean PSNR', torch.mean(lowres_psnrs), logger=True,on_epoch=True)
-        self.log('Test/Input SEM PSNR', torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),logger=True,on_epoch=True)
-        self.log('Test/Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True,on_epoch=True)
-        self.log('Test/Prediction SEM PSNR', torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),logger=True,on_epoch=True)
+        #self.log('Test/Input Mean PSNR', torch.mean(lowres_psnrs), logger=True,on_epoch=True)
+        #self.log('Test/Input SEM PSNR', torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),logger=True,on_epoch=True)
+        #self.log('Test/Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True,on_epoch=True)
+        #self.log('Test/Prediction SEM PSNR', torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),logger=True,on_epoch=True)
 
     def convert2img(self, fc, mag_min, mag_max):
         dft = convert2DFT(x=fc, amp_min=mag_min, amp_max=mag_max, dst_flatten_order=self.dst_flatten_order,
@@ -228,7 +239,7 @@ class SResTransformerModule(LightningModule):
                 if k[:5] == 'sres.':
                     sd[k[5:]] = weights['state_dict'][k]
             self.sres_pred.load_state_dict(sd)
-            print("weights loaded successfully")
+            # print("weights loaded successfully")
 
         self.sres_pred.to(self.device)
 

@@ -78,8 +78,8 @@ class MNIST_SResFITDM(SResFITDataModule):
         # mnist_train = mnist_train_val[:55000, 1:, 1:]
         # mnist_val = mnist_train_val[55000:, 1:, 1:]
         
-        mnist_train = mnist_train_val[0, 1:, 1:]
-        mnist_val = mnist_train_val[0, 1:, 1:]
+        mnist_train = mnist_train_val[112, 1:, 1:]
+        mnist_val = mnist_train_val[112, 1:, 1:]
         mnist_train = torch.tile(mnist_train, (32,1,1))
         mnist_val = torch.tile(mnist_val, (32,1,1))
         
