@@ -7,6 +7,9 @@ from fit.transformers.masking import LengthMask,FullMask
 from fit.transformers.Attention.Attention import AttentionLayer,FullAttention
 from fit.transformers.Attention.LinearAttention import LinearAttention
 # from fit.transformers.Attention.CausalLinearAttention import CausalLinearAttention
+from mamba_ssm import Mamba
+
+
 
 
 class TransformerEncoderLayer(Module):
@@ -33,6 +36,7 @@ class TransformerEncoderLayer(Module):
     def __init__(self, attention, d_model, d_ff=None, dropout=0.1,
                  activation="relu", event_dispatcher=""):
         super(TransformerEncoderLayer, self).__init__()
+        d_ff = 377;d_model = 377
         d_ff = d_ff or 4*d_model
         self.attention = attention
         self.linear1 = Linear(d_model, d_ff)
@@ -59,17 +63,12 @@ class TransformerEncoderLayer(Module):
         # Normalize the masks
         N = x.shape[0]
         L = x.shape[1]
-        attn_mask = attn_mask or FullMask(L, device=x.device)
-        length_mask = length_mask or \
-            LengthMask(x.new_full((N,), L, dtype=torch.int64))
-
+        # attn_mask = attn_mask or FullMask(L, device=x.device)
+        # length_mask = length_mask or \
+        #     LengthMask(x.new_full((N,), L, dtype=torch.int64))
+        x = x * attn_mask
         # Run self attention and add it to the input
-        x = x + self.dropout(self.attention(
-            x, x, x,
-            attn_mask=attn_mask,
-            query_lengths=length_mask,
-            key_lengths=length_mask
-        ))
+        x = x + self.dropout(self.attention(x))
 
         # Run the fully connected part of the layer
         y = x = self.norm1(x)
@@ -84,14 +83,22 @@ class EncoderBlock(nn.Module):
     def __init__(self,d_model, n_layers, n_heads,d_query,dropout, attention_dropout,*args, **kwargs) -> None:
         super().__init__()
         self.n_layers = n_layers
-        self.attention_block = nn.MultiheadAttention(embed_dim=d_model,num_heads = n_heads,dropout=attention_dropout,batch_first = True,kdim = d_model, vdim = d_model)
-        self.attention = AttentionLayer(FullAttention(), d_model = d_model, n_heads = n_heads)
+        # self.attention = nn.MultiheadAttention(embed_dim=d_model,num_heads = n_heads,dropout=attention_dropout,batch_first = True,kdim = d_model, vdim = d_model)
+        # self.attention = AttentionLayer(FullAttention(), d_model = d_model, n_heads = n_heads)
+        self.attention = Mamba(d_model = 377)
         self.encoder_layer = TransformerEncoderLayer(attention = self.attention, d_model = d_model, d_ff=None,dropout=dropout,activation = 'relu')
         self.layers = ModuleList([self.encoder_layer for _ in range(n_layers)])    
+    
     def forward(self, x, mask=None):
         y = self.layers[0](x,mask)
         for i in range(1,self.n_layers):
             y = self.layers[i](y,mask)
         return y
+    
+    # def forward(self, x, mask=None):
+    #     y = self.layers[0](x,mask)
+    #     for i in range(1,self.n_layers):
+    #         y = self.layers[i](y,mask)
+    #     return y
     
     

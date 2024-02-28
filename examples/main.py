@@ -16,7 +16,6 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 import matplotlib.gridspec as gridspec
 from os.path import exists
-import wget
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 torch.set_float32_matmul_precision('medium')
@@ -32,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str, help="Model to be used in the transformer",default = '')
     parser.add_argument("--dataset", type=str, help="Dataset to be used",default = 'MNIST')
     parser.add_argument("--n_heads", type=int, help="No of heads in model",default = 8)
-    parser.add_argument("--loss", type=str, help="loss",default = 'sum_modified')
+    parser.add_argument("--loss", type=str, help="loss",default = 'sum')
     parser.add_argument("--note", type=str, help="note",default = '')
     parser.add_argument("--d_query", type=int, help="d_query",default = 32)
     parser.add_argument("--subset_flag", type=bool,default = True)
@@ -83,10 +82,12 @@ if __name__ == '__main__':
                     enable_checkpointing=True,default_root_dir = f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}', 
                                                 callbacks=ModelCheckpoint(
                                                 dirpath=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',
-                                                verbose=True,
-                                                save_last=True)
-)
+                                                save_top_k=1,
+                                                verbose=False,
+                                                save_last=True,
+                                                monitor='loss',
+                                                mode='min'))
 
     trainer.fit(model, datamodule=dm)
-    trainer.validate(model, datamodule=dm)
+    # trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)

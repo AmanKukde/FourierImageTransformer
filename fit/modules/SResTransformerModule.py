@@ -7,10 +7,11 @@ from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
 from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
 from fit.transformers.SResTransformer import SResTransformerTrain, SResTransformerPredict
 from fit.utils import denormalize_FC, PSNR, convert2DFT
-from fit.utils.RAdam import RAdam
+# from fit.utils.Adam import Adam
+from torch.optim import Adam
 import wandb
 import numpy as np
-
+import matplotlib.pyplot as plt
 import torch.fft
 from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
 
@@ -86,6 +87,7 @@ class SResTransformerModule(LightningModule):
         return {
             'optimizer': optimizer,
             'monitor': 'loss'
+            'monitor': 'loss'
         }
 
     def criterion(self, pred_fc, target_fc, mag_min, mag_max):
@@ -111,6 +113,7 @@ class SResTransformerModule(LightningModule):
         fc_loss, amp_loss, phi_loss = self.criterion(pred, torch.cat([self.get_amp_phi_from_emb(sos),fc],1), mag_min, mag_max)
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
         self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
+        self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
         
         return {'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss}
     
@@ -118,6 +121,9 @@ class SResTransformerModule(LightningModule):
         loss = torch.mean(torch.tensor([x['loss'] for x in self.outputs]))
         amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
         phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
+        self.log('Train/train_loss', loss, logger=True, on_epoch=True)
+        self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
+        self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
         self.log('Train/train_loss', loss, logger=True, on_epoch=True)
         self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
         self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
@@ -162,10 +168,10 @@ class SResTransformerModule(LightningModule):
             self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
             self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
 
-    def convert2img(self, fc, mag_min, mag_max):
-        dft = convert2DFT(x=fc, amp_min=mag_min, amp_max=mag_max, dst_flatten_order=self.dst_flatten_order,
-                          img_shape=self.hparams.img_shape)
-        return torch.fft.irfftn(dft, s = 2 * (self.hparams.img_shape,), dim=[1,2])
+    # def convert2img(self, fc, mag_min, mag_max):
+    #     dft = convert2DFT(x=fc, amp_min=mag_min, amp_max=mag_max, dst_flatten_order=self.dst_flatten_order,
+    #                       img_shape=self.hparams.img_shape)
+    #     return torch.fft.irfftn(dft, s = 2 * (self.hparams.img_shape,), dim=[1,2])
 
     def get_lowres_pred_gt(self, fc, pred, mag_min, mag_max):
         pred_img = self.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
