@@ -7,7 +7,7 @@ from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
 from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
 from fit.transformers.SResTransformer import SResTransformerTrain, SResTransformerPredict
 from fit.utils import denormalize_FC, PSNR, convert2DFT
-# from fit.utils.Adam import Adam
+from fit.utils.RAdam import RAdam
 from torch.optim import Adam
 import wandb
 import numpy as np
