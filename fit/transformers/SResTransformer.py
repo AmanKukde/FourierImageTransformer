@@ -24,7 +24,10 @@ class SResTransformerTrain(torch.nn.Module):
             persistent=False
         ) 
 
-        self.encoder = EncoderBlock(d_model=d_model,d_query = d_query, n_layers=n_layers, n_heads=n_heads, dropout = dropout,attention_dropout=attention_dropout)
+
+        self.encoder = torch.nn.Transformer(d_model = 256,nhead=8, num_encoder_layers=8,batch_first = True)
+
+
         
         self.predictor_amp = torch.nn.Linear(
             n_heads * d_query,

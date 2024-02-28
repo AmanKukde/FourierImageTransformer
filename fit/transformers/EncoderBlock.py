@@ -84,7 +84,7 @@ class EncoderBlock(nn.Module):
     def __init__(self,d_model, n_layers, n_heads,d_query,dropout, attention_dropout,*args, **kwargs) -> None:
         super().__init__()
         self.n_layers = n_layers
-        # self.attention = nn.MultiheadAttention(embed_dim=d_model,num_heads = n_heads,dropout=attention_dropout,batch_first = True,kdim = d_model, vdim = d_model)
+        self.attention_block = nn.MultiheadAttention(embed_dim=d_model,num_heads = n_heads,dropout=attention_dropout,batch_first = True,kdim = d_model, vdim = d_model)
         self.attention = AttentionLayer(FullAttention(), d_model = d_model, n_heads = n_heads)
         self.encoder_layer = TransformerEncoderLayer(attention = self.attention, d_model = d_model, d_ff=None,dropout=dropout,activation = 'relu')
         self.layers = ModuleList([self.encoder_layer for _ in range(n_layers)])    
