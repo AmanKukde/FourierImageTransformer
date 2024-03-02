@@ -12,6 +12,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
+from torchvision import transforms
 
 from fit.datamodules.super_res import SResFourierCoefficientDataset
 from fit.datamodules.GroundTruthDatasetFactory import GroundTruthDatasetFactory
@@ -37,7 +38,9 @@ class SResFITDataModule(LightningDataModule):
         tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=None,
                                                  amp_max=None)
         self.mag_min = tmp_fcds.amp_min
+        self.mag_min = torch.tensor(0.)
         self.mag_max = tmp_fcds.amp_max
+        self.mag_max = torch.tensor(255.)
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
@@ -69,30 +72,33 @@ class MNIST_SResFITDM(SResFITDataModule):
             MNIST handwritten digit database. 2010.
         """
         super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=27)
+    
+    def _discretize(self,sample):
+        return (sample * 255).to(torch.long)
 
-    def prepare_data(self,*args, **kwargs):
-        mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
-        mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
+    def prepare_data(self, *args, **kwargs):
+        transform = transforms.Compose([transforms.ToTensor(),
+                                self._discretize])
+        mnist_test = MNIST(self.root_dir, train=False,transform=transform, download=True).data.type(torch.float32)
+        mnist_train_val = MNIST(self.root_dir, train=True,  transform=transform,download=True).data.type(torch.float32)
         np.random.seed(1612)
-        # perm = np.random.permutation(mnist_train_val.shape[0])
-        # mnist_train = mnist_train_val[:55000, 1:, 1:]
-        # mnist_val = mnist_train_val[55000:, 1:, 1:]
-        
-        mnist_train = mnist_train_val[112, 1:, 1:]
-        mnist_val = mnist_train_val[112, 1:, 1:]
-        mnist_train = torch.tile(mnist_train, (32,1,1))
-        mnist_val = torch.tile(mnist_val, (32,1,1))
-        
-        mnist_test = mnist_test[:, 1:, 1:]
-        self.mean = mnist_train.mean()
-        self.std = mnist_train.std()
 
-        mnist_train = normalize(mnist_train, self.mean, self.std)
-        mnist_val = normalize(mnist_val, self.mean, self.std)
-        mnist_test = normalize(mnist_test, self.mean, self.std)
+        # perm = np.random.permutation(mnist_tra j
+        
+        batch_size = 8
+        mnist_train = mnist_train_val[114, 1:, 1:]
+        mnist_val = mnist_train_val[114, 1:, 1:]
+        mnist_train = torch.tile(mnist_train, (batch_size,1,1))
+        mnist_val = torch.tile(mnist_val, (batch_size,1,1))
+        mnist_test =  mnist_train
 
+        # self.mean = mnist_train.mean()
+        # self.std = mnist_train.std()
+
+        # mnist_train = normalize(mnist_train, self.mean, self.std)
+        # mnist_val = normalize(mnist_val, self.mean, self.std)
+        # mnist_test = normalize(mnist_test, self.mean, self.std)
         self.gt_ds = GroundTruthDatasetFactory(mnist_train, mnist_val, mnist_test)
-
 
 class CelebA_SResFITDM(SResFITDataModule):
 

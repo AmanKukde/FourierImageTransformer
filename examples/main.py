@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # Train your own model.
 
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") +f"_{loss}_+{note}"
-    wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
+    wandb_logger = None#WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
     
     trainer = Trainer(max_epochs=1000,logger=wandb_logger,
                     enable_checkpointing=True,default_root_dir = f'/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/saved_models/{name}', 
