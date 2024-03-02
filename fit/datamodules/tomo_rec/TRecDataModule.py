@@ -298,5 +298,4 @@ class Kanji_TRecFITDM(TomoFITDataModule):
 
         ds_factory = GroundTruthDatasetFactory(gt_train, gt_val, gt_test, inner_circle=self.inner_circle)
         self.gt_ds = ds_factory.build_projection_dataset(num_angles=self.num_angles,
-                                                         upscale_shape=133,
-                                                         impl='astra_cpu')
+                                                         upscale_shape=133)

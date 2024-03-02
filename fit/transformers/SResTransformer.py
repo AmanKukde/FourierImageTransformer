@@ -1,6 +1,8 @@
 import torch
+import sys
+sys.path.append('/home/aman.kukde/Projects/Revision/FourierImageTransformer/fast-transformers/')
 from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
-from fast_transformers.masking import TriangularCausalMask
+from fast_transformers.masking import TriangularCausalMask, FullMask
 
 from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
 

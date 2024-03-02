@@ -150,3 +150,6 @@ lightning_logs
 
 # model ipynb_checkpoints
 *.ckpt
+*.png
+*.jpg
+*.json

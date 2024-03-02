@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../../../')
 import torch
 from fast_transformers.builders import TransformerDecoderBuilder, TransformerEncoderBuilder
 

@@ -76,10 +76,18 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
         np.random.seed(1612)
+
         perm = np.random.permutation(mnist_train_val.shape[0])
         mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
         mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
         mnist_test = mnist_test[:, 1:, 1:]
+        
+        # batch_size = 8
+        # mnist_train = mnist_train_val[114, 1:, 1:]
+        # mnist_val = mnist_train_val[114, 1:, 1:]
+        # mnist_train = torch.tile(mnist_train, (batch_size,1,1))
+        # mnist_val = torch.tile(mnist_val, (batch_size,1,1))
+        # mnist_test =  mnist_train
 
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
@@ -89,8 +97,6 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_test = normalize(mnist_test, self.mean, self.std)
 
         self.gt_ds = GroundTruthDatasetFactory(mnist_train, mnist_val, mnist_test)
-
-
 class CelebA_SResFITDM(SResFITDataModule):
 
     def __init__(self, root_dir, batch_size):

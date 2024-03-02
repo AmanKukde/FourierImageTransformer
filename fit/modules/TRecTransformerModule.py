@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
