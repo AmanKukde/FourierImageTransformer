@@ -3,7 +3,7 @@ from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from fit.modules.loss import _fc_prod_loss, _fc_sum_loss
-from fit.transformers.SResTransformer import SResTransformerTrain, SResTransformerPredict
+from fit.transformers.SResTransformer import SResTransformerTrain
 from fit.utils import denormalize_FC, convert2DFT#, PSNR
 from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
 from fit.utils.RAdam import RAdam
@@ -42,8 +42,6 @@ class SResTransformerModule(LightningModule):
         self.dft_shape = (img_shape, img_shape // 2 + 1)
         self.shells = num_shells
         
-        
-
         self.coords = coords
         self.dst_flatten_order = dst_flatten_order
         self.dst_order = dst_order
@@ -144,24 +142,24 @@ class SResTransformerModule(LightningModule):
         self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
 
     def load_test_model(self, path):
-        self.sres_pred = SResTransformerPredict(self.hparams.d_model,
-                                                coords=self.coords,
-                                                flatten_order=self.dst_flatten_order,
-                                                attention_type='full',
-                                                n_layers=self.hparams.n_layers,
-                                                n_heads=self.hparams.n_heads,
-                                                d_query=self.hparams.d_query,
-                                                dropout=self.hparams.dropout,
-                                                attention_dropout=self.hparams.attention_dropout)
+        self.sres = SResTransformerTrain(self.hparams.d_model,
+                                            coords=self.coords,
+                                            flatten_order=self.dst_flatten_order,
+                                            attention_type='full',
+                                            n_layers=self.hparams.n_layers,
+                                            n_heads=self.hparams.n_heads,
+                                            d_query=self.hparams.d_query,
+                                            dropout=self.hparams.dropout,
+                                            attention_dropout=self.hparams.attention_dropout)
         if len(path) > 0:
             weights = torch.load(path)
             sd = {}
             for k in weights['state_dict'].keys():
                 if k[:5] == 'sres.':
                     sd[k[5:]] = weights['state_dict'][k]
-            self.sres_pred.load_state_dict(sd)
+            self.sres.load_state_dict(sd)
 
-        self.sres_pred.to(self.device)
+        self.sres.to('cuda')
 
     def predict_with_recurrent(self, fcs, n, seq_len):
         memory = None
@@ -191,7 +189,17 @@ class SResTransformerModule(LightningModule):
 
     def test_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
+
+        x_fc = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
+        pred = self.sres.forward_i(x_fc,self.input_seq_length)
+        
+        pred_img = self.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
+        lowres = torch.zeros_like(pred)
+        lowres += fc.min()
+        lowres[:, :self.input_seq_length] = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
+        lowres_img = self.convert2img(fc=lowres, mag_min=mag_min, mag_max=mag_max)
+        gt_img = self.convert2img(fc=fc[:, self.dst_flatten_order], mag_min=mag_min, mag_max=mag_max)
+        
 
         lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
         pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
@@ -201,20 +209,8 @@ class SResTransformerModule(LightningModule):
                        #range(gt_img.shape[0])]
         pred_psnr = PSNR(gt_img,pred_img)#[PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
                      #range(gt_img.shape[0])]
-        self.test_outputs = [lowres_psnr, pred_psnr]
+        self.test_outputs = [lowres_psnr, pred_psnr,pred_img, lowres_img, gt_img]
         return (lowres_psnr, pred_psnr)
-
-    def get_lowres_pred_gt(self, fc, mag_min, mag_max):
-        x_fc = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
-        pred = self.predict_with_recurrent(x_fc, self.input_seq_length, fc.shape[1])
-        pred_img = self.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
-        lowres = torch.zeros_like(pred)
-        lowres += fc.min()
-        lowres[:, :self.input_seq_length] = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
-        lowres_img = self.convert2img(fc=lowres, mag_min=mag_min, mag_max=mag_max)
-        gt_img = self.convert2img(fc=fc[:, self.dst_flatten_order], mag_min=mag_min, mag_max=mag_max)
-        return lowres_img, pred_img, gt_img
-
     def on_test_epoch_end(self):
         lowres_psnrs = self.test_outputs[0]
         pred_psnrs = self.test_outputs[1]

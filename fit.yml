@@ -1,0 +1,4 @@
+name: /home/aman.kukde/Projects/FourierImageTransformer/FIT
+channels:
+  - conda-forge
+prefix: /home/aman.kukde/Projects/FourierImageTransformer/FIT

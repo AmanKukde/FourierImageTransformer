@@ -17,7 +17,6 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 import matplotlib.gridspec as gridspec
 from os.path import exists
-import wget
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -29,13 +28,24 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=8)
-    parser.add_argument("--lr", type=float, help="Learning rate", default=0.0001)
-    parser.add_argument("--n_shells",type=int,help="Number of shells used as lowres input in the transformer",default=5)
-    parser.add_argument("--model", type=str, help="Model to be used in the transformer", default="")
-    parser.add_argument("--dataset", type=str, help="Dataset to be used", default="MNIST")
+    parser.add_argument(
+        "--n_layers", type=int, help="Number of layers in the transformer", default=8
+    )
+    parser.add_argument("--lr", type=float, help="Learning rate", default=0.001)
+    parser.add_argument(
+        "--n_shells",
+        type=int,
+        help="Number of shells used as lowres input in the transformer",
+        default=4,
+    )
+    parser.add_argument(
+        "--model", type=str, help="Model to be used in the transformer", default=""
+    )
+    parser.add_argument(
+        "--dataset", type=str, help="Dataset to be used", default="MNIST"
+    )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="prod")
+    parser.add_argument("--loss", type=str, help="loss", default="sum")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
@@ -53,7 +63,7 @@ if __name__ == "__main__":
     note = args.note
 
     if dataset == "MNIST":
-        dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=8)
+        dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32)
     else:
         dm = CelebA_SResFITDM(root_dir="examples/datamodules/data/CelebA", batch_size=8)
         lr = 0.00001
@@ -84,29 +94,23 @@ if __name__ == "__main__":
     # Train your own model.
 
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
-    wandb_logger = WandbLogger(
-        name=f"Run_{name}",
-        project="MNIST",
-        save_dir=f"/home/aman.kukde/Projects/Revision/FourierImageTransformer/saved_models/{name}",
-        log_model="all",
-        settings=wandb.Settings(code_dir="."),
-    )
+    wandb_logger = None#WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     trainer = Trainer(
         max_epochs=1000,
         logger=wandb_logger,
         enable_checkpointing=True,
-        default_root_dir=f"/home/aman.kukde/Projects/Revision/FourierImageTransformer/saved_models/{name}",
+        default_root_dir=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
         callbacks=ModelCheckpoint(
-            dirpath=f"/home/aman.kukde/Projects/Revision/FourierImageTransformer/saved_models/{name}",
+            dirpath=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
             save_top_k=1,
             verbose=False,
             save_last=True,
-            monitor="Train/train_loss",
+            monitor="Validation/avg_val_loss",
             mode="min",
         ),
     )
 
-    trainer.fit(model, datamodule=dm)
-    trainer.validate(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    # trainer.fit(model, datamodule=dm)
+    # trainer.validate(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)

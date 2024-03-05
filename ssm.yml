@@ -1,0 +1,4 @@
+name: /home/aman.kukde/Projects/FourierImageTransformer/SSM
+channels:
+  - conda-forge
+prefix: /home/aman.kukde/Projects/FourierImageTransformer/SSM

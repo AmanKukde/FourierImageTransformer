@@ -153,3 +153,5 @@ lightning_logs
 *.png
 *.jpg
 *.json
+*.DS_Store
+*.gitignore

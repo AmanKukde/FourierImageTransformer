@@ -40,14 +40,14 @@ __all__ = [
 #       implementations be imported in order to be useable? This also allows
 #       using the library even partially built, for instance.
 from ..attention import \
-    FullAttention, \
-    LinearAttention
+    FullAttention
+    # LinearAttention
     #ClusteredAttention, ImprovedClusteredAttention, \
     #ReformerAttention, \
     #ExactTopKAttention, ImprovedClusteredCausalAttention, \
     #ConditionalFullAttention
-del FullAttention, \
-    LinearAttention
+del FullAttention
+    # LinearAttention
     #ClusteredAttention, ImprovedClusteredAttention, \
     #ReformerAttention, \
     #ExactTopKAttention, ImprovedClusteredCausalAttention, \
