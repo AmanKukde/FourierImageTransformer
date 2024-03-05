@@ -51,10 +51,9 @@ class SResTransformerTrain(torch.nn.Module):
     def forward(self, x):
         x = self.fourier_coefficient_embedding(x)
         x = self.pos_embedding(x)
-        triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
-        y_hat = self.encoder(x, attn_mask=triangular_mask)
-        y_amp = self.predictor_amp(y_hat)
-        y_phase = torch.tanh(self.predictor_phase(y_hat))
+
+        y_amp = self.predictor_amp(x)
+        y_phase = torch.tanh(self.predictor_phase(x))
         return torch.cat([y_amp, y_phase], dim=-1)
     
     # def forward_i(self, x):
