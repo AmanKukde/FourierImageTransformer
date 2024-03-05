@@ -112,8 +112,8 @@ class SResTransformerModule(LightningModule):
         pred = self.sres.forward(x_fc)
 
         val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
-        if batch_idx == 0:
-            self.log_val_images(fc, mag_min, mag_max)
+        # if batch_idx == 0:
+        #     self.log_val_images(fc, mag_min, mag_max)
 
         self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss}
         return {'val_loss': val_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss}

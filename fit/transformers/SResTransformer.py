@@ -1,7 +1,6 @@
 import torch
 import sys
 sys.path.append('/home/aman.kukde/Projects/FourierImageTransformer/fast_transformers/')
-from fast_transformers.builders import TransformerEncoderBuilder, RecurrentEncoderBuilder
 from fast_transformers.masking import TriangularCausalMask, FullMask
 
 from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
@@ -28,16 +27,8 @@ class SResTransformerTrain(torch.nn.Module):
             persistent=False
         )
 
-        self.encoder = TransformerEncoderBuilder.from_kwargs(
-            attention_type=attention_type,
-            n_layers=n_layers,
-            n_heads=n_heads,
-            feed_forward_dimensions=n_heads * d_query * 4,
-            query_dimensions=d_query,
-            value_dimensions=d_query,
-            dropout=dropout,
-            attention_dropout=attention_dropout
-        ).get()
+        encoder_layer = torch.nn.TransformerEncoderLayer(d_model=256, nhead=8,batch_first=True)
+        self.encoder = torch.nn.TransformerEncoder(encoder_layer, num_layers=8)
 
         self.predictor_amp = torch.nn.Linear(
             n_heads * d_query,
@@ -52,7 +43,7 @@ class SResTransformerTrain(torch.nn.Module):
         x = self.fourier_coefficient_embedding(x)
         x = self.pos_embedding(x)
         triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
-        y_hat = self.encoder(x, attn_mask=triangular_mask)
+        y_hat = self.encoder(x, mask=triangular_mask.additive_matrix_finite)
         y_amp = self.predictor_amp(y_hat)
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)

@@ -1,4 +1,4 @@
-# %%
+
 import sys
 sys.path.append('../')
 sys.path.append('./')
@@ -23,22 +23,22 @@ import ssl
 import torchvision
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# %%
+
 seed_everything(22122020)
 
-# %%
+
 dm = MNIST_SResFITDM(root_dir='./datamodules/data/', batch_size=8)
 dm.prepare_data()
 dm.setup()
 
-# %%
+
 r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
 
-# %%
+
 n_heads = 8
 d_query = 32
 
-# %%
+
 model = SResTransformerModule(d_model=n_heads*d_query, 
                               img_shape=dm.gt_shape,
                               coords=(r, phi),
@@ -48,7 +48,7 @@ model = SResTransformerModule(d_model=n_heads*d_query,
                               lr=0.0001, weight_decay=0.01, n_layers=8,
                               n_heads=n_heads, d_query=d_query, dropout=0.1, attention_dropout=0.1,num_shells = 4)
 
-# %%
+
 trainer = Trainer(max_epochs=100, 
                 #   gpus=1,nvidia  # set to 0 if you want to run on CPU
                   callbacks=ModelCheckpoint(
@@ -61,20 +61,20 @@ trainer = Trainer(max_epochs=100,
                                         ), 
                   deterministic=True)
 
-# %%
+
 model.load_test_model('/home/aman.kukde/Projects/FourierImageTransformer/models_saved/04-03_23-23-38_sum_+/epoch=254-step=438345.ckpt')
 # model.cuda()
 
-# %%
+
 for fc, (mag_min, mag_max) in dm.test_dataloader():
     break
 
-# %%
+
 fc = fc.to('cuda')
 mag_min = mag_min.to('cuda')
 mag_max = mag_max.to('cuda')
 
-# %%
+
 x_fc = fc[:, flatten_order][:, :96]
 pred = model.sres.forward_i(x_fc,96)
 
@@ -85,10 +85,10 @@ plt.savefig('pred_img_aman.png')
 
 
 
-# # %%
+# 
 # PSNR(gt,lowres) - PSNR(gt,pred_img)
 
-# # %%
+# 
 # for sample in range(10):
 #     fig = plt.figure(figsize=(31/2., 10/2.)) 
 #     gs = gridspec.GridSpec(1, 5, width_ratios=[10,0.5, 10, 0.5, 10]) 
@@ -117,7 +117,7 @@ plt.savefig('pred_img_aman.png')
 #     ax2.set_title('Ground Truth');
 #     ax2.axis('equal');
 
-# # %%
+# 
 # diff = []
 # lowres_scaled = torch.zeros_like(lowres)
 # pred_img_scaled = torch.zeros_like(pred_img)
@@ -157,19 +157,19 @@ plt.savefig('pred_img_aman.png')
 #     ax2.axis('equal');
 #     # diff.append(lowres_vs_gt_psnr - pred_vs_gt_psnr)
 
-# # %%
+# 
 # dummy = torch.zeros(3,10,5)
 
-# # %%
+# 
 # x = torch.randn(3,2,5)
 
-# # %%
+# 
 # dummy[:,:2,:] = x
 
-# # %%
+# 
 # dummy
 
-# # %%
+# 
 
 
 
