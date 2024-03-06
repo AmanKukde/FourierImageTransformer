@@ -64,6 +64,22 @@ trainer = Trainer(max_epochs=100,
 # %%
 model.load_test_model('/home/aman.kukde/Projects/FourierImageTransformer/models_saved/04-03_23-23-38_sum_+/epoch=254-step=438345.ckpt')
 # model.cuda()
+embed_enc_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
+def load_partial_state_dict(model, state_dict):
+    own_state = model.state_dict()
+    for name, param in state_dict.items():
+        if name in own_state:
+            print(f'Copying {name}')
+            if own_state[name].size() == param.size():
+                own_state[name].copy_(param)
+                own_state[name].requires_grad = False
+        # else:
+        #     print(f'Layer {name} not found in current model')
+    model.load_state_dict(embed_enc_weights, strict=False)
+    return model
+
+model = load_partial_state_dict(model, embed_enc_weights)
+    # Train your own model.
 
 # %%
 for fc, (mag_min, mag_max) in dm.test_dataloader():

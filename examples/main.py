@@ -90,9 +90,22 @@ if __name__ == "__main__":
         num_shells=n_shells,
         model_path=model,
     )
+    embed_enc_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
+    def load_partial_state_dict(model, state_dict):
+        own_state = model.state_dict()
+        for name, param in state_dict.items():
+            if name in own_state:
+                print(f'Copying {name}')
+                if own_state[name].size() == param.size():
+                    own_state[name].copy_(param)
+                    own_state[name].requires_grad = False
+            # else:
+            #     print(f'Layer {name} not found in current model')
+        model.load_state_dict(embed_enc_weights, strict=False)
+        return model
 
+    model = load_partial_state_dict(model, embed_enc_weights)
     # Train your own model.
-
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
     wandb_logger = None#WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 

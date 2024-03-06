@@ -211,6 +211,7 @@ class SResTransformerModule(LightningModule):
                      #range(gt_img.shape[0])]
         self.test_outputs = [lowres_psnr, pred_psnr,pred_img, lowres_img, gt_img]
         return (lowres_psnr, pred_psnr)
+    
     def on_test_epoch_end(self):
         lowres_psnrs = self.test_outputs[0]
         pred_psnrs = self.test_outputs[1]
