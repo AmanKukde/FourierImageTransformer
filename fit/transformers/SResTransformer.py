@@ -38,7 +38,7 @@ class SResTransformerTrain(torch.nn.Module):
             dropout=dropout,
             attention_dropout=attention_dropout
         ).get()
-
+        
         self.predictor_amp = torch.nn.Linear(
             n_heads * d_query,
             1
@@ -47,6 +47,12 @@ class SResTransformerTrain(torch.nn.Module):
             n_heads * d_query,
             1
         )
+
+        self.encoder.require_grad= True
+        self.predictor_amp.require_grad= False
+        self.predictor_phase.require_grad= False
+        self.fourier_coefficient_embedding.require_grad= False
+        self.pos_embedding.require_grad= False
 
     def forward(self, x):
         x = self.fourier_coefficient_embedding(x)
