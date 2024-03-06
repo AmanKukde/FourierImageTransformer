@@ -2,7 +2,7 @@ import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from fit.modules.loss import _fc_prod_loss, _fc_sum_loss
+from fit.modules.loss import _fc_prod_loss, _fc_sum_loss, _fc_prod_loss_modified, _fc_sum_loss_modified
 from fit.transformers.SResTransformer import SResTransformerTrain
 from fit.utils import denormalize_FC, convert2DFT#, PSNR
 from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
@@ -49,8 +49,12 @@ class SResTransformerModule(LightningModule):
 
         if loss == 'prod':
             self.loss = _fc_prod_loss
-        else:
+        elif loss == 'sum':
             self.loss = _fc_sum_loss
+        elif loss == 'prod_modified':
+            self.loss = _fc_prod_loss_modified
+        elif loss == 'sum_modified':
+            self.loss = _fc_sum_loss_modified
 
         self.sres = SResTransformerTrain(d_model=self.hparams.d_model,
                                          coords=self.coords,

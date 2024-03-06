@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "--dataset", type=str, help="Dataset to be used", default="MNIST"
     )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="sum")
+    parser.add_argument("--loss", type=str, help="loss", default="prod_modifed")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
@@ -96,6 +96,37 @@ if __name__ == "__main__":
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
     wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
+    model = SResTransformerModule(d_model=n_heads*d_query, 
+                              img_shape=dm.gt_shape,
+                              coords=(r, phi),
+                              dst_flatten_order=flatten_order,
+                              dst_order=order,
+                              loss='prod',
+                              lr=0.0001, weight_decay=0.01, n_layers=8,
+                              n_heads=n_heads, d_query=d_query, dropout=0.1, attention_dropout=0.1,num_shells = 4)
+
+    tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
+
+    for key in list(tokeniser_weights.keys()):
+        if '.encoder' in key:
+            del tokeniser_weights[key]
+
+    def load_partial_state_dict(model, state_dict):
+        own_state = model.state_dict()
+        for name, param in state_dict.items():
+            if name in own_state:
+                print(f'Copying {name}')
+                if own_state[name].size() == param.size():
+                    own_state[name].copy_(param)
+                    own_state[name].requires_grad = False
+            # else:
+            #     print(f'Layer {name} not found in current model')
+        model.load_state_dict(tokeniser_weights, strict=False)
+        return model
+
+    model = load_partial_state_dict(model, tokeniser_weights)
+
+
     trainer = Trainer(
         max_epochs=1000,
         logger=wandb_logger,
@@ -110,7 +141,6 @@ if __name__ == "__main__":
             mode="min",
         ),
     )
-
     trainer.fit(model, datamodule=dm)
     # trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
