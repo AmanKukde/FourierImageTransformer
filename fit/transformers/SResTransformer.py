@@ -82,16 +82,16 @@ class SResTransformerTrain(torch.nn.Module):
         with torch.no_grad():
             x_hat = self.fourier_coefficient_embedding(x)
             x_hat = self.pos_embedding(x_hat)
-            padded_input[:,:input_seq_length] = x_hat
+            padded_input[:,:1] = x_hat[:,:1]
             for i in range(input_seq_length,377-1):
                 mask[:i,:i] = True
                 fast_mask = FullMask(mask = mask, device=x.device)
                 y_hat = self.encoder(padded_input,attn_mask = fast_mask)
-                padded_input[:,i,:] =  y_hat[:,i,:]  #97th element but 96th index
+                padded_input[:,i,:] =  y_hat[:,i-1,:]  #97th element but 96th index
             output = padded_input
             y_amp = self.predictor_amp(output)
             y_phase = torch.tanh(self.predictor_phase(output))
-            # y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
-            # y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
+            y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
+            y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
             return torch.cat([y_amp, y_phase], dim=-1)
 
