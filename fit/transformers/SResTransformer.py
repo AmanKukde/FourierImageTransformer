@@ -77,16 +77,19 @@ class SResTransformerTrain(torch.nn.Module):
         self.encoder.eval()
         self.pos_embedding.eval()
         self.fourier_coefficient_embedding.eval()
+        padded_input = torch.zeros(x.shape[0],377,x.shape[-1]).to(x.device)
+        mask = torch.full((377,377),-float('Inf')).to(x.device)
         with torch.no_grad():
             x_hat = self.fourier_coefficient_embedding(x)
             x_hat = self.pos_embedding(x_hat)
             for i in range(input_seq_length,377+1):
-                y_hat = self.encoder(x_hat[:,:i,:])
-                y = y_hat[:,-1,:]
-                y = y.view(y.shape[0],-1,y.shape[-1])
-                x_hat = torch.cat([x_hat,y],dim = 1)
-            y_amp = self.predictor_amp(x_hat[:,:-1,:])
-            y_phase = torch.tanh(self.predictor_phase(x_hat[:,:-1,:]))
+                padded_input[:,:i,:] = x_hat[:,:i,:]
+                mask[:i,:i] = 0
+                y_hat = self.encoder(padded_input,mask = mask)
+                padded_input[:,i,:] =  y_hat[:,i+1,:]  #97th element but 96th index
+            output = padded_input
+            y_amp = self.predictor_amp(output)
+            y_phase = torch.tanh(self.predictor_phase(output))
             # y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
             # y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
             return torch.cat([y_amp, y_phase], dim=-1)
