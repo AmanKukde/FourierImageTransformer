@@ -74,7 +74,7 @@ class TransformerEncoderLayer(Module):
             LengthMask(x.new_full((N,), L, dtype=torch.int64))
 
         # Run self attention and add it to the input
-        x = x + self.dropout(self.attention(
+        x_out = x + self.dropout(self.attention(
             x, x, x,
             attn_mask=attn_mask,
             query_lengths=length_mask,
@@ -82,11 +82,11 @@ class TransformerEncoderLayer(Module):
         ))
 
         # Run the fully connected part of the layer
-        y = x = self.norm1(x)
+        y = x_out = self.norm1(x_out)
         y = self.dropout(self.activation(self.linear1(y)))
         y = self.dropout(self.linear2(y))
 
-        return self.norm2(x+y)
+        return self.norm2(x_out+y)
 
 
 class TransformerEncoder(Module):

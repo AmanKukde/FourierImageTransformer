@@ -68,9 +68,9 @@ class FullAttention(Module):
         # Compute the unnormalized attention and apply the masks
         QK = torch.einsum("nlhe,nshe->nhls", queries, keys)
         if not attn_mask.all_ones:
-            QK = QK + attn_mask.additive_matrix
+            QK = QK + attn_mask.additive_matrix_finite
         if not key_lengths.all_ones:
-            QK = QK + key_lengths.additive_matrix[:, None, None]
+            QK = QK + key_lengths.additive_matrix_finite[:, None, None]
 
         # Compute the attention and the weighted average
         A = self.dropout(torch.softmax(QK, dim=-1))
