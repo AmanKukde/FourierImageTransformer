@@ -94,6 +94,7 @@ if __name__ == "__main__":
     # Train your own model.
 
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
+    name = "TorchSRes_" + name
     wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     model = SResTransformerModule(d_model=n_heads*d_query, 
@@ -137,7 +138,7 @@ if __name__ == "__main__":
             save_top_k=1,
             verbose=False,
             save_last=True,
-            monitor="Validation/avg_val_loss",
+            monitor="Train/train_loss",
             mode="min",
         ),
     )
