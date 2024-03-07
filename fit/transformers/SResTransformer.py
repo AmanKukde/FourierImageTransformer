@@ -1,5 +1,5 @@
 import torch
-from fit.transformers.masking import TriangularCausalMask
+from fit.transformers.masking import TriangularCausalMask,FullMask
 from fit.transformers.EncoderBlock import EncoderBlock
 from fit.transformers.RecurrentEncoderBlock import RecurrentEncoderBlock
 from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
@@ -44,6 +44,29 @@ class SResTransformerTrain(torch.nn.Module):
         y_amp = torch.tanh(self.predictor_amp(y_hat))
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
+    
+    def forward_i(self, x,input_seq_length=100):
+        self.encoder.eval()
+        self.pos_embedding.eval()
+        self.fourier_coefficient_embedding.eval()
+        padded_input = torch.zeros(x.shape[0],377,256).to(x.device)
+        mask = torch.full((377,377),bool(False)).to(x.device)
+        with torch.no_grad():
+            x_hat = self.fourier_coefficient_embedding(x)
+            x_hat = self.pos_embedding(x_hat)
+            padded_input[:,:1] = x_hat[:,:1]
+            for i in range(input_seq_length,377-1):
+                mask[:i,:i] = True
+                fast_mask = FullMask(mask = mask, device=x.device)
+                y_hat = self.encoder(padded_input,attn_mask = fast_mask)
+                padded_input[:,i,:] =  y_hat[:,i-1,:]  #97th element but 96th index
+            output = padded_input
+            y_amp = self.predictor_amp(output)
+            y_phase = torch.tanh(self.predictor_phase(output))
+            y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
+            y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
+            return torch.cat([y_amp, y_phase], dim=-1)
+    
 
 
 class SResTransformerPredict(torch.nn.Module):
@@ -82,3 +105,4 @@ class SResTransformerPredict(torch.nn.Module):
         y_amp = torch.tanh(self.predictor_amp(y_hat))
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1), state
+
