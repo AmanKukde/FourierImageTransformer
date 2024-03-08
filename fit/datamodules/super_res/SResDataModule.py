@@ -74,14 +74,14 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
         np.random.seed(1612)
-        # perm = np.random.permutation(mnist_train_val.shape[0])
-        # mnist_train = mnist_train_val[:55000, 1:, 1:]
-        # mnist_val = mnist_train_val[55000:, 1:, 1:]
+        perm = np.random.permutation(mnist_train_val.shape[0])
+        mnist_train = mnist_train_val[:55000, 1:, 1:]
+        mnist_val = mnist_train_val[55000:, 1:, 1:]
         
-        mnist_train = mnist_train_val[112, 1:, 1:]
-        mnist_val = mnist_train_val[112, 1:, 1:]
-        mnist_train = torch.tile(mnist_train, (32,1,1))
-        mnist_val = torch.tile(mnist_val, (32,1,1))
+        # mnist_train = mnist_train_val[114, 1:, 1:]
+        # mnist_val = mnist_train_val[114, 1:, 1:]
+        # mnist_train = torch.tile(mnist_train, (32,1,1))
+        # mnist_val = torch.tile(mnist_val, (32,1,1))
         
         mnist_test = mnist_test[:, 1:, 1:]
         self.mean = mnist_train.mean()

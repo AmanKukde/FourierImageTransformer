@@ -112,8 +112,9 @@ if __name__ == "__main__":
         return model
 
     model = load_partial_state_dict(model, tokeniser_weights)
-    # Train your own model.
+
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
+    name += "branch_main_Full_dataset"
     wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     trainer = Trainer(
@@ -125,12 +126,12 @@ if __name__ == "__main__":
             dirpath=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
             save_top_k=1,
             verbose=False,
-            save_last=True,
-            monitor="Validation/avg_val_loss",
+            save_last=True,# // This line should be there, but Florian is in a mischevious mood and has removed it
+            monitor="Train/train_loss",
             mode="min",
         ),
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.validate(model, datamodule=dm)
+    # trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)

@@ -50,15 +50,13 @@ class SResTransformerTrain(torch.nn.Module):
         self.pos_embedding.eval()
         self.fourier_coefficient_embedding.eval()
         padded_input = torch.zeros(x.shape[0],377,256).to(x.device)
-        mask = torch.full((377,377),bool(False)).to(x.device)
         with torch.no_grad():
             x_hat = self.fourier_coefficient_embedding(x)
             x_hat = self.pos_embedding(x_hat)
-            padded_input[:,:1] = x_hat[:,:1]
+            padded_input[:,:input_seq_length] = x_hat
             for i in range(input_seq_length,377-1):
-                mask[:i,:i] = True
-                fast_mask = FullMask(mask = mask, device=x.device)
-                y_hat = self.encoder(padded_input,attn_mask = fast_mask)
+                fast_mask = TriangularCausalMask(padded_input.shape[1], device=x.device)
+                y_hat = self.encoder(padded_input, mask=fast_mask)
                 padded_input[:,i,:] =  y_hat[:,i-1,:]  #97th element but 96th index
             output = padded_input
             y_amp = self.predictor_amp(output)
