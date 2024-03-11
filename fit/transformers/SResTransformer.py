@@ -1,4 +1,5 @@
 import torch
+from mamba_ssm import Mamba
 from fit.transformers.masking import TriangularCausalMask,FullMask
 from fit.transformers.EncoderBlock import EncoderBlock
 from fit.transformers.RecurrentEncoderBlock import RecurrentEncoderBlock
@@ -23,7 +24,19 @@ class SResTransformerTrain(torch.nn.Module):
             flatten_order=flatten_order,
             persistent=False
         ) 
+        # Source: Mamba Repository
 
+
+        batch, length, dim = 2, 64, 16
+        x = torch.randn(batch, length, dim).to("cuda")
+        model = Mamba(
+            # This module uses roughly 3 * expand * d_model^2 parameters
+            d_model=dim, # Model dimension d_model
+            d_state=16,  # SSM state expansion factor
+            d_conv=4,    # Local convolution width
+            expand=2,    # Block expansion factor
+        ).to("cuda")
+        
         self.encoder = EncoderBlock(d_model=d_model,d_query = d_query, n_layers=n_layers, n_heads=n_heads, dropout = dropout,attention_dropout=attention_dropout)
         
         self.predictor_amp = torch.nn.Linear(
