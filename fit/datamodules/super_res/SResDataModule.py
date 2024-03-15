@@ -43,17 +43,17 @@ class SResFITDataModule(LightningDataModule):
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=3)
+            batch_size=self.batch_size, num_workers=0)
 
-    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max), batch_size=self.batch_size, num_workers=3)
+    # def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+    #     return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
+    #                                       amp_max=self.mag_max), batch_size=self.batch_size, num_workers=0)
 
-    def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
-            batch_size=self.batch_size,num_workers=3)
+    # def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+    #     return DataLoader(
+    #         SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
+    #                                       amp_max=self.mag_max),
+    #         batch_size=self.batch_size,num_workers=0)
 
 class MNIST_SResFITDM(SResFITDataModule):
 

@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "--dataset", type=str, help="Dataset to be used", default="MNIST"
     )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="sum_modified")
+    parser.add_argument("--loss", type=str, help="loss", default="prod_modified")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     model = load_partial_state_dict(model, tokeniser_weights)
 
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
-    name += "branch_main_Full_dataset"
+    name += "branch_main_Full_dataset_Train"
     wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     trainer = Trainer(
