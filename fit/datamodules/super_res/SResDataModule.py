@@ -45,15 +45,15 @@ class SResFITDataModule(LightningDataModule):
                                           amp_max=self.mag_max),
             batch_size=self.batch_size, num_workers=0)
 
-    # def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-    #     return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-    #                                       amp_max=self.mag_max), batch_size=self.batch_size, num_workers=0)
+    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max), batch_size=self.batch_size, num_workers=0)
 
-    # def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-    #     return DataLoader(
-    #         SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
-    #                                       amp_max=self.mag_max),
-    #         batch_size=self.batch_size,num_workers=0)
+    def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max),
+            batch_size=self.batch_size,num_workers=0)
 
 class MNIST_SResFITDM(SResFITDataModule):
 
@@ -78,10 +78,10 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_train = mnist_train_val[:55000, 1:, 1:]
         mnist_val = mnist_train_val[55000:, 1:, 1:]
         
-        # mnist_train = mnist_train_val[114, 1:, 1:]
-        # mnist_val = mnist_train_val[114, 1:, 1:]
-        # mnist_train = torch.tile(mnist_train, (32,1,1))
-        # mnist_val = torch.tile(mnist_val, (32,1,1))
+        mnist_train = mnist_train_val[132, 1:, 1:]
+        mnist_val = mnist_train_val[132, 1:, 1:]
+        mnist_train = torch.tile(mnist_train, (32,1,1))
+        mnist_val = torch.tile(mnist_val, (32,1,1))
         
         mnist_test = mnist_test[:, 1:, 1:]
         self.mean = mnist_train.mean()

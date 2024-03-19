@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
-from fit.transformers.SResTransformer import SResTransformerTrain, SResTransformerPredict
+from fit.transformers.SResTransformer import SResTransformerTrain
 from fit.utils import denormalize_FC, PSNR, convert2DFT
 from fit.utils.RAdam import RAdam
 import wandb
