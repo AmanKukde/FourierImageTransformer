@@ -82,12 +82,12 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
         mnist_test = mnist_test[:, 1:, 1:]
         
-        # batch_size = 8
-        # mnist_train = mnist_train_val[114, 1:, 1:]
-        # mnist_val = mnist_train_val[114, 1:, 1:]
-        # mnist_train = torch.tile(mnist_train, (batch_size,1,1))
-        # mnist_val = torch.tile(mnist_val, (batch_size,1,1))
-        # mnist_test =  mnist_train
+        batch_size = 32
+        mnist_train = mnist_train_val[114, 1:, 1:]
+        mnist_val = mnist_train_val[114, 1:, 1:]
+        mnist_train = torch.tile(mnist_train, (batch_size,1,1))
+        mnist_val = torch.tile(mnist_val, (batch_size,1,1))
+        mnist_test =  mnist_train
 
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
