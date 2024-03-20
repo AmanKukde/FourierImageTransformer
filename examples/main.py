@@ -45,10 +45,11 @@ if __name__ == "__main__":
         "--dataset", type=str, help="Dataset to be used", default="MNIST"
     )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="sum_modified")
+    parser.add_argument("--loss", type=str, help="loss", default="cce")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
+    parser.add_argument("--tokeniser_freeze", type=bool, default=False)
 
     args = parser.parse_args()
     n_layers = args.n_layers
@@ -61,9 +62,11 @@ if __name__ == "__main__":
     d_query = args.d_query
     subset_flag = args.subset_flag
     note = args.note
+    tokeniser_freeze = True
 
     if dataset == "MNIST":
         dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32)
+        # dm = MNIST_SResFITDM(root_dir="/scratch/aman.kukde/data/", batch_size=32)
     else:
         dm = CelebA_SResFITDM(root_dir="examples/datamodules/data/CelebA", batch_size=8)
         lr = 0.00001
@@ -90,34 +93,36 @@ if __name__ == "__main__":
         num_shells=n_shells,
         model_path=model,
     )
+    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_{note}"
+    name+=f"ss_{subset_flag}"
+    
+    if not tokeniser_freeze:
+        tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
 
-    tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
+        for key in list(tokeniser_weights.keys()):
+            if '.encoder' in key:
+                del tokeniser_weights[key]
+            def load_partial_state_dict(model, state_dict):
+                own_state = model.state_dict()
+                for name, param in state_dict.items():
+                    if name in own_state:
+                        print(f'Copying {name}')
+                        if own_state[name].size() == param.size():
+                            own_state[name].copy_(param)
+                            own_state[name].requires_grad = False
+                            own_state[name].training = False
+                    # else:
+                    #     print(f'Layer {name} not found in current model')
+                model.load_state_dict(tokeniser_weights, strict=False)
+                
+                return model
 
-    for key in list(tokeniser_weights.keys()):
-        if '.encoder' in key:
-            del tokeniser_weights[key]
-
-    def load_partial_state_dict(model, state_dict):
-        own_state = model.state_dict()
-        for name, param in state_dict.items():
-            if name in own_state:
-                print(f'Copying {name}')
-                if own_state[name].size() == param.size():
-                    own_state[name].copy_(param)
-                    own_state[name].requires_grad = False
-                    own_state[name].training = False
-            # else:
-            #     print(f'Layer {name} not found in current model')
-        model.load_state_dict(tokeniser_weights, strict=False)
-        return model
-
-    model = load_partial_state_dict(model, tokeniser_weights)
-    # Train your own model.
-    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_+{note}"
-    wandb_logger = WandbLogger(name = f'Run_{name}',project="MNIST",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
+            model = load_partial_state_dict(model, tokeniser_weights);name += "_tokeniser_freeze"
+        
+    wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     trainer = Trainer(
-        max_epochs=1000,
+        max_epochs=20000,
         logger=wandb_logger,
         enable_checkpointing=True,
         default_root_dir=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
@@ -125,8 +130,8 @@ if __name__ == "__main__":
             dirpath=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
             save_top_k=1,
             verbose=False,
-            save_last=True,
-            monitor="Validation/avg_val_loss",
+            save_last=True,# // This line should be there, but Florian is in a mischevious mood and has removed it
+            monitor="Train/train_loss",
             mode="min",
         ),
     )
