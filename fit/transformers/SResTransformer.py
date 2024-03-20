@@ -60,8 +60,8 @@ class SResTransformerTrain(torch.nn.Module):
             output = padded_input
             y_amp = torch.tanh(self.predictor_amp(output))
             y_phase = torch.tanh(self.predictor_phase(output))
-            y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
-            y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
+            # y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
+            # y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
         return torch.cat([y_amp, y_phase], dim=-1)
     
 
