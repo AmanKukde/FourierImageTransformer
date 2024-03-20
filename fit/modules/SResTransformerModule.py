@@ -48,6 +48,7 @@ class SResTransformerModule(LightningModule):
         self.model_path = model_path
         self.saved_model_path = saved_model_path
         self.n_layers = n_layers
+        self.loss = loss
         
 
         # #self.logger = WandbLogger(save_dir='/home/aman.kukde/Projects/Super_Resolution_Task/Original_FIT/FourierImageTransformer/examples/models/sres') 
@@ -60,7 +61,6 @@ class SResTransformerModule(LightningModule):
             self.loss = _fc_prod_loss_modified
         elif loss == 'sum_modified':
             self.loss = _fc_sum_loss_modified
-
         self.sres = SResTransformerTrain(d_model=self.d_model,
                                          coords=self.coords,
                                          flatten_order=self.dst_flatten_order,
@@ -94,7 +94,7 @@ class SResTransformerModule(LightningModule):
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, verbose=True)
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'Train/train_loss'
         }
 
@@ -110,7 +110,31 @@ class SResTransformerModule(LightningModule):
 
         pred = self.sres.forward(x_fc)
 
-        fc_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
+        # lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
+        # del lowres_img
+        # # lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        # # pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        # # gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        
+        # if self.loss == 'inverse_psnr':
+        #     psnr_loss =  1/PSNR(gt_img,pred_img)
+        #     self.outputs.append({'loss': psnr_loss})
+        #     self.log_dict({'loss': psnr_loss},prog_bar=True,on_step=True)
+        #     return {'loss': psnr_loss}
+        
+        # if self.loss == 'mse':
+        #     mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
+        #     self.outputs.append({'loss': mse_loss})
+        #     self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
+        #     return {'loss': mse_loss}
+        # if self.loss == 'cce':
+        #     loss = torch.nn.CrossEntropyLoss()
+        #     cce_loss = loss(pred_img,gt_img)
+        #     self.outputs.append({'loss': cce_loss})
+        #     self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
+        #     return {'loss': cce_loss}
+
+        fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
         self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
         
@@ -118,41 +142,42 @@ class SResTransformerModule(LightningModule):
     
     def on_train_epoch_end(self):        
         loss = torch.mean(torch.tensor([x['loss'] for x in self.outputs]))
-        amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
-        phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
+        # amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
+        # phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
         self.log('Train/train_loss', loss, logger=True, on_epoch=True)
-        self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
-        self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
+
+        # self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
+        # self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
         self.outputs = []
         
 
-    def validation_step(self, batch, batch_idx):
-        fc, (mag_min, mag_max) = batch
-        x_fc = fc[:, self.dst_flatten_order][:, :-1]
-        y_fc = fc[:, self.dst_flatten_order][:, 1:]
+    # def validation_step(self, batch, batch_idx):
+    #     fc, (mag_min, mag_max) = batch
+    #     x_fc = fc[:, self.dst_flatten_order][:, :-1]
+    #     y_fc = fc[:, self.dst_flatten_order][:, 1:]
 
-        pred = self.sres.forward(x_fc)
+    #     pred = self.sres.forward(x_fc)
 
-        val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
-        if batch_idx == 0:
-            self.log_val_images(fc, mag_min, mag_max)
+    #     val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
+    #     if batch_idx == 0:
+    #         self.log_val_images(fc, mag_min, mag_max)
         
-        lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
-        lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-        pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-        gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+    #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
+    #     lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+    #     pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+    #     gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
 
-        lowres_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], lowres_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-                       range(gt_img.shape[0])]))
-        pred_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-                       range(gt_img.shape[0])]))
-        low_res_vs_pred_psnr = torch.mean(torch.tensor([PSNR(lowres_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-                     range(gt_img.shape[0])]))
+    #     lowres_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], lowres_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+    #                    range(gt_img.shape[0])]))
+    #     pred_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+    #                    range(gt_img.shape[0])]))
+    #     low_res_vs_pred_psnr = torch.mean(torch.tensor([PSNR(lowres_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+    #                  range(gt_img.shape[0])]))
         
         
-        self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss, 'val_lowres_psnr': lowres_vs_gt_psnr, 'val_pred_psnr': pred_vs_gt_psnr, 'val_lowres_vs_pred_psnr': low_res_vs_pred_psnr}
-        #self.log_dict(self.val_outputs)
-        return self.val_outputs
+    #     self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss, 'val_lowres_psnr': lowres_vs_gt_psnr, 'val_pred_psnr': pred_vs_gt_psnr, 'val_lowres_vs_pred_psnr': low_res_vs_pred_psnr}
+    #     #self.log_dict(self.val_outputs)
+    #     return self.val_outputs
 
     def log_val_images(self, fc, mag_min, mag_max):
         self.load_test_model(self.trainer.checkpoint_callback.last_model_path)
@@ -194,11 +219,13 @@ class SResTransformerModule(LightningModule):
             self.sres.load_state_dict(sd)
         self.sres.to('cuda')
 
-    def get_lowres_pred_gt(self, fc, mag_min, mag_max):
+    def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
         x_fc = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
         pred = self.sres.forward_i(x_fc,self.input_seq_length)
-        
-        pred_img = self.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
+        lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc, pred, mag_min, mag_max)
+
+    def get_lowres_pred_gt(self, fc, pred, mag_min, mag_max):
+        pred_img = self.convert2img(pred, mag_min=mag_min, mag_max=mag_max)
         lowres = torch.zeros_like(pred)
         lowres += fc.min()
         lowres[:, :self.input_seq_length] = fc[:, self.dst_flatten_order][:, :self.input_seq_length]

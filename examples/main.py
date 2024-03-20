@@ -45,7 +45,7 @@ if __name__ == "__main__":
         "--dataset", type=str, help="Dataset to be used", default="MNIST"
     )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="prod_modified")
+    parser.add_argument("--loss", type=str, help="loss", default="cce")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         dm = CelebA_SResFITDM(root_dir="examples/datamodules/data/CelebA", batch_size=8)
         lr = 0.00001
 
-    dm.prepare_data()
+    dm.prepare_data(subset_flag=subset_flag)
     dm.setup()
 
     r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
@@ -93,7 +93,8 @@ if __name__ == "__main__":
         num_shells=n_shells,
         model_path=model,
     )
-
+    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_{note}"
+    name+=f"ss_{subset_flag}"
     tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/model.ckpt')['state_dict']
 
     for key in list(tokeniser_weights.keys()):
@@ -112,20 +113,15 @@ if __name__ == "__main__":
                 # else:
                 #     print(f'Layer {name} not found in current model')
             model.load_state_dict(tokeniser_weights, strict=False)
+            
             return model
 
-        model = load_partial_state_dict(model, tokeniser_weights)
-
-    name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_{note}"
-    name += "_132_only"
-    if tokeniser_freeze:
-        name += "_tokeniser_freeze"
-    else:
-        name += "_tokeniser_not_freeze"
+        model = load_partial_state_dict(model, tokeniser_weights);name += "_tokeniser_not_freeze"
+        
     wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="all",settings=wandb.Settings(code_dir="."))
 
     trainer = Trainer(
-        max_epochs=2000,
+        max_epochs=20000,
         logger=wandb_logger,
         enable_checkpointing=True,
         default_root_dir=f"/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}",
@@ -140,5 +136,5 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm)
-    trainer.validate(model, datamodule=dm)
+    # trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)
