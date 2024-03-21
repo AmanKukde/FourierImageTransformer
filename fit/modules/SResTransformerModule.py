@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
 from fit.transformers.SResTransformer import SResTransformerTrain
 from fit.utils import denormalize_FC, PSNR, convert2DFT
+from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
 from fit.utils.RAdam import RAdam
 import wandb
 import numpy as np
@@ -105,36 +106,34 @@ class SResTransformerModule(LightningModule):
 
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        x_fc = fc[:, self.dst_flatten_order][:, :-1]
-        y_fc = fc[:, self.dst_flatten_order][:, 1:]
+        # x_fc = fc[:, self.dst_flatten_order][:, :-1]
+        # y_fc = fc[:, self.dst_flatten_order][:, 1:]
 
-        pred = self.sres.forward(x_fc)
-
-        # lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
-        # del lowres_img
-        # # lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-        # # pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-        # # gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        pred = self.sres.forward(fc)
+        # new_pred = fc[:, self.dst_flatten_order].copy()
+        # new_pred[:,1:,:] = pred
         
-        # if self.loss == 'inverse_psnr':
-        #     psnr_loss =  1/PSNR(gt_img,pred_img)
-        #     self.outputs.append({'loss': psnr_loss})
-        #     self.log_dict({'loss': psnr_loss},prog_bar=True,on_step=True)
-        #     return {'loss': psnr_loss}
         
-        # if self.loss == 'mse':
-        #     mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
-        #     self.outputs.append({'loss': mse_loss})
-        #     self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
-        #     return {'loss': mse_loss}
-        # if self.loss == 'cce':
-        #     loss = torch.nn.CrossEntropyLoss()
-        #     cce_loss = loss(pred_img,gt_img)
-        #     self.outputs.append({'loss': cce_loss})
-        #     self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
-        #     return {'loss': cce_loss}
 
-        fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
+        
+        if self.loss == 'mse':
+            lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
+            mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
+            self.outputs.append({'loss': mse_loss})
+            self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
+            return {'loss': mse_loss}
+        
+        if self.loss == 'cce':
+            lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
+            loss_func = torch.nn.CrossEntropyLoss()
+            cce_loss = loss_func(pred_img,gt_img)
+            self.outputs.append({'loss': cce_loss})
+            self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
+            return {'loss': cce_loss}
+
+        # fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
+        fc_loss, amp_loss, phi_loss = self.criterion(pred, fc , mag_min, mag_max) #Tokeniser only loss
+
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
         self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
         
@@ -179,26 +178,26 @@ class SResTransformerModule(LightningModule):
     #     #self.log_dict(self.val_outputs)
     #     return self.val_outputs
 
-    def log_val_images(self, fc, mag_min, mag_max):
-        self.load_test_model(self.trainer.checkpoint_callback.last_model_path)
-        lowres, pred, gt = self.get_lowres_pred_gt(fc, mag_min=mag_min, mag_max=mag_max)
-        for i in range(min(3, len(lowres))):
-            lowres_ = torch.clamp((lowres[i].unsqueeze(0) - lowres.min()) / (lowres.max() - lowres.min()), 0, 1)
-            pred_ = torch.clamp((pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0, 1)
-            gt_ = torch.clamp((gt[i].unsqueeze(0) - gt.min()) / (gt.max() - gt.min()), 0, 1)
+    # def log_val_images(self, fc, mag_min, mag_max):
+    #     self.load_test_model(self.trainer.checkpoint_callback.last_model_path)
+    #     lowres, pred, gt = self.get_lowres_pred_gt(fc, mag_min=mag_min, mag_max=mag_max)
+    #     for i in range(min(3, len(lowres))):
+    #         lowres_ = torch.clamp((lowres[i].unsqueeze(0) - lowres.min()) / (lowres.max() - lowres.min()), 0, 1)
+    #         pred_ = torch.clamp((pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0, 1)
+    #         gt_ = torch.clamp((gt[i].unsqueeze(0) - gt.min()) / (gt.max() - gt.min()), 0, 1)
 
-            self.logger.experiment.log({f"Validation_Images/val_input_image":[wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
-            self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
-            self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
+    #         self.logger.experiment.log({f"Validation_Images/val_input_image":[wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
+    #         self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
+    #         self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
 
-    def on_validation_epoch_end(self):
-        val_loss = self.val_outputs['val_loss']
-        amp_loss = self.val_outputs['val_amp_loss']
-        phi_loss = self.val_outputs['val_phi_loss']
+    # def on_validation_epoch_end(self):
+    #     val_loss = self.val_outputs['val_loss']
+    #     amp_loss = self.val_outputs['val_amp_loss']
+    #     phi_loss = self.val_outputs['val_phi_loss']
 
-        self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
-        self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
-        self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
+    #     self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
+    #     self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
+    #     self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
     
     def load_test_model(self, path):
         self.sres = SResTransformerTrain(self.hparams.d_model,

@@ -79,11 +79,11 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_val = mnist_train_val[55000:, 1:, 1:]
 
         # if 'subset_flag' in  kwargs:
-        #     if kwargs.get('subset_flag'):
-        mnist_train = mnist_train_val[114, 1:, 1:]
-        mnist_val = mnist_train_val[114, 1:, 1:]
-        mnist_train = torch.tile(mnist_train, (32,1,1))
-        mnist_val = torch.tile(mnist_val, (32,1,1))
+        # #     if kwargs.get('subset_flag'):
+        # mnist_train = mnist_train_val[114, 1:, 1:]
+        # mnist_val = mnist_train_val[114, 1:, 1:]
+        # mnist_train = torch.tile(mnist_train, (32,1,1))
+        # mnist_val = torch.tile(mnist_val, (32,1,1))
 
         mnist_test = mnist_test[:, 1:, 1:]
         self.mean = mnist_train.mean()
