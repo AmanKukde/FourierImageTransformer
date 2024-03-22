@@ -96,35 +96,35 @@ if __name__ == "__main__":
         model_path=model,
     )
     name = datetime.datetime.now().strftime("%d-%m_%H-%M-%S") + f"_{loss}_{note}"
-    name+=f"ss_{subset_flag}"
+    # name+=f"ss_{subset_flag}"
     
-    if tokeniser_pretrained:
-        tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/models_saved/tokeniser_3/epoch=699-step=1203300.ckpt')['state_dict']
+    # if tokeniser_pretrained:
+    #     tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/models_saved/tokeniser_3/epoch=699-step=1203300.ckpt')['state_dict']
 
-        for key in list(tokeniser_weights.keys()):
-            if '.encoder' in key:
-                del tokeniser_weights[key]
-        def load_partial_state_dict(model, state_dict):
-            own_state = model.state_dict()
-            for name, param in state_dict.items():
-                if name in own_state:
-                    print(f'Copying {name}')
-                    if own_state[name].size() == param.size():
-                        own_state[name].copy_(param)
-                        # if tokeniser_freeze:
-                        #     own_state[name].requires_grad = False
-                        #     own_state[name].training = False
-                else:
-                    print(f'Layer {name} not found in current model')
-                model.load_state_dict(tokeniser_weights, strict=False)
-                return model
+    #     for key in list(tokeniser_weights.keys()):
+    #         if '.encoder' in key:
+    #             del tokeniser_weights[key]
+    #     def load_partial_state_dict(model, state_dict):
+    #         own_state = model.state_dict()
+    #         for name, param in state_dict.items():
+    #             if name in own_state:
+    #                 print(f'Copying {name}')
+    #                 if own_state[name].size() == param.size():
+    #                     own_state[name].copy_(param)
+    #                     # if tokeniser_freeze:
+    #                     #     own_state[name].requires_grad = False
+    #                     #     own_state[name].training = False
+    #             else:
+    #                 print(f'Layer {name} not found in current model')
+    #             model.load_state_dict(tokeniser_weights, strict=False)
+    #             return model
 
-        model = load_partial_state_dict(model, tokeniser_weights); name += "_tokeniser_pretrained"; 
-    if tokeniser_freeze: 
-        name += "_frozen"
+    #     model = load_partial_state_dict(model, tokeniser_weights); name += "_tokeniser_pretrained"; 
+    # if tokeniser_freeze: 
+    #     name += "_frozen"
 
-    # wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
-    wandb_logger = None
+    wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
+    # wandb_logger = None
 
     trainer = Trainer(
         max_epochs=20000,

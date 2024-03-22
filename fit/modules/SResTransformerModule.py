@@ -13,6 +13,7 @@ import numpy as np
 # from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
 import torch.fft
 from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
+import matplotlib.pyplot as plt
 
 
 class SResTransformerModule(LightningModule):
@@ -91,7 +92,8 @@ class SResTransformerModule(LightningModule):
         return self.sres.forward(x)
 
     def configure_optimizers(self):
-        optimizer = RAdam(self.sres.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        # optimizer = RAdam(self.sres.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+        optimizer = torch.optim.Adam(self.sres.parameters(), lr = self.hparams.lr, weight_decay = self.hparams.weight_decay)
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, verbose=True)
         return {
             'optimizer': optimizer,
@@ -108,7 +110,7 @@ class SResTransformerModule(LightningModule):
         fc, (mag_min, mag_max) = batch
         x_fc = fc[:, self.dst_flatten_order][:, :-1]
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
-        pred = self.sres.forward(x_fc)
+        pred = self.sres.forward(x_fc,y_fc)
 
         
         if self.loss == 'mse':
@@ -143,54 +145,53 @@ class SResTransformerModule(LightningModule):
         self.outputs = []
         
 
-    # def validation_step(self, batch, batch_idx):
-    #     fc, (mag_min, mag_max) = batch
-    #     x_fc = fc[:, self.dst_flatten_order][:, :-1]
-    #     y_fc = fc[:, self.dst_flatten_order][:, 1:]
+    def validation_step(self, batch, batch_idx):
+        fc, (mag_min, mag_max) = batch
+        x_fc = fc[:, self.dst_flatten_order][:, :-1]
+        y_fc = fc[:, self.dst_flatten_order][:, 1:]
 
-    #     pred = self.sres.forward(x_fc)
+        pred = self.sres.forward_i(x_fc)
 
-    #     val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
-    #     if batch_idx == 0:
-    #         self.log_val_images(fc, mag_min, mag_max)
+        val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
+        if batch_idx == 0:
+            self.log_val_images(fc, mag_min, mag_max)
         
-    #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
-    #     lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-    #     pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
-    #     gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
+        lowres_img = denormalize(lowres_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        pred_img = denormalize(pred_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
+        gt_img = denormalize(gt_img, self.trainer.datamodule.mean, self.trainer.datamodule.std)
 
-    #     lowres_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], lowres_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-    #                    range(gt_img.shape[0])]))
-    #     pred_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-    #                    range(gt_img.shape[0])]))
-    #     low_res_vs_pred_psnr = torch.mean(torch.tensor([PSNR(lowres_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
-    #                  range(gt_img.shape[0])]))
+        lowres_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], lowres_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+                       range(gt_img.shape[0])]))
+        pred_vs_gt_psnr = torch.mean(torch.tensor([PSNR(gt_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+                       range(gt_img.shape[0])]))
+        low_res_vs_pred_psnr = torch.mean(torch.tensor([PSNR(lowres_img[i], pred_img[i], drange=torch.tensor(255., dtype=torch.float32)) for i in
+                     range(gt_img.shape[0])]))
         
         
-    #     self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss, 'val_lowres_psnr': lowres_vs_gt_psnr, 'val_pred_psnr': pred_vs_gt_psnr, 'val_lowres_vs_pred_psnr': low_res_vs_pred_psnr}
-    #     #self.log_dict(self.val_outputs)
-    #     return self.val_outputs
+        self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss, 'val_lowres_psnr': lowres_vs_gt_psnr, 'val_pred_psnr': pred_vs_gt_psnr, 'val_lowres_vs_pred_psnr': low_res_vs_pred_psnr}
+        #self.log_dict(self.val_outputs)
+        return self.val_outputs
 
-    # def log_val_images(self, fc, mag_min, mag_max):
-    #     self.load_test_model(self.trainer.checkpoint_callback.last_model_path)
-    #     lowres, pred, gt = self.get_lowres_pred_gt(fc, mag_min=mag_min, mag_max=mag_max)
-    #     for i in range(min(3, len(lowres))):
-    #         lowres_ = torch.clamp((lowres[i].unsqueeze(0) - lowres.min()) / (lowres.max() - lowres.min()), 0, 1)
-    #         pred_ = torch.clamp((pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0, 1)
-    #         gt_ = torch.clamp((gt[i].unsqueeze(0) - gt.min()) / (gt.max() - gt.min()), 0, 1)
+    def log_val_images(self, fc, mag_min, mag_max):
+        self.load_test_model(self.trainer.checkpoint_callback.last_model_path)
+        lowres, pred, gt = self.get_lowres_pred_gt(fc, mag_min=mag_min, mag_max=mag_max)
+        for i in range(min(3, len(lowres))):
+            lowres_ = torch.clamp((lowres[i].unsqueeze(0) - lowres.min()) / (lowres.max() - lowres.min()), 0, 1)
+            pred_ = torch.clamp((pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0, 1)
+            gt_ = torch.clamp((gt[i].unsqueeze(0) - gt.min()) / (gt.max() - gt.min()), 0, 1)
 
-    #         self.logger.experiment.log({f"Validation_Images/val_input_image":[wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],"global_step": self.trainer.global_step})
-    #         self.logger.experiment.log({f"Validation_Images/val_pred_image":[wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],"global_step": self.trainer.global_step})                                   
-    #         self.logger.experiment.log({f"Validation_Images/val_gt_image":[wandb.Image(gt_.cpu(), caption=f"ground_truth/img_{i}")],"global_step": self.trainer.global_step})
+            plt.imshow(torch.cat([lowres_, pred_, gt_], dim=2).squeeze().cpu().numpy(), cmap='gray');
+            plt.savefig(f'val_{i}.png')
 
-    # def on_validation_epoch_end(self):
-    #     val_loss = self.val_outputs['val_loss']
-    #     amp_loss = self.val_outputs['val_amp_loss']
-    #     phi_loss = self.val_outputs['val_phi_loss']
+    def on_validation_epoch_end(self):
+        val_loss = self.val_outputs['val_loss']
+        amp_loss = self.val_outputs['val_amp_loss']
+        phi_loss = self.val_outputs['val_phi_loss']
 
-    #     self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
-    #     self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
-    #     self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
+        self.log('Validation/avg_val_loss', torch.mean(val_loss), logger=True, on_epoch=True)
+        self.log('Validation/avg_val_amp_loss', torch.mean(amp_loss), logger=True, on_epoch=True)
+        self.log('Validation/avg_val_phi_loss', torch.mean(phi_loss), logger=True, on_epoch=True)
     
     def load_test_model(self, path):
         self.sres = SResTransformerTrain(self.hparams.d_model,
