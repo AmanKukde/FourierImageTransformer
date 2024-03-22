@@ -45,11 +45,12 @@ if __name__ == "__main__":
         "--dataset", type=str, help="Dataset to be used", default="MNIST"
     )
     parser.add_argument("--n_heads", type=int, help="No of heads in model", default=8)
-    parser.add_argument("--loss", type=str, help="loss", default="new_loss")
+    parser.add_argument("--loss", type=str, help="loss", default="prod_modified")
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
     parser.add_argument("--tokeniser_pretrained", type=bool, default=True)
+    parser.add_argument("--tokeniser_freeze", type=bool, default=False)
 
     args = parser.parse_args()
     n_layers = args.n_layers
@@ -63,9 +64,10 @@ if __name__ == "__main__":
     subset_flag = args.subset_flag
     note = args.note
     tokeniser_pretrained = args.tokeniser_pretrained
+    tokeniser_freeze = args.tokeniser_freeze
 
     if dataset == "MNIST":
-        dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32)
+        dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=8)
         # dm = MNIST_SResFITDM(root_dir="/scratch/aman.kukde/data/", batch_size=32)
     else:
         dm = CelebA_SResFITDM(root_dir="examples/datamodules/data/CelebA", batch_size=8)
@@ -97,30 +99,32 @@ if __name__ == "__main__":
     name+=f"ss_{subset_flag}"
     
     if tokeniser_pretrained:
-        tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/tokeniser.ckpt')['state_dict']
+        tokeniser_weights = torch.load('/home/aman.kukde/Projects/FourierImageTransformer/models_saved/tokeniser_3/epoch=699-step=1203300.ckpt')['state_dict']
 
         for key in list(tokeniser_weights.keys()):
             if '.encoder' in key:
                 del tokeniser_weights[key]
-            def load_partial_state_dict(model, state_dict):
-                own_state = model.state_dict()
-                for name, param in state_dict.items():
-                    if name in own_state:
-                        print(f'Copying {name}')
-                        if own_state[name].size() == param.size():
-                            own_state[name].copy_(param)
-                            # own_state[name].requires_grad = False
-                            # own_state[name].training = False
-                    # else:
-                    #     print(f'Layer {name} not found in current model')
+        def load_partial_state_dict(model, state_dict):
+            own_state = model.state_dict()
+            for name, param in state_dict.items():
+                if name in own_state:
+                    print(f'Copying {name}')
+                    if own_state[name].size() == param.size():
+                        own_state[name].copy_(param)
+                        # if tokeniser_freeze:
+                        #     own_state[name].requires_grad = False
+                        #     own_state[name].training = False
+                else:
+                    print(f'Layer {name} not found in current model')
                 model.load_state_dict(tokeniser_weights, strict=False)
-                
                 return model
 
-        model = load_partial_state_dict(model, tokeniser_weights); name += "_tokeniser_pretrained"
-    name += f"tokeniser_3_{loss}"
-    wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
-    # wandb_logger = None
+        model = load_partial_state_dict(model, tokeniser_weights); name += "_tokeniser_pretrained"; 
+    if tokeniser_freeze: 
+        name += "_frozen"
+
+    # wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
+    wandb_logger = None
 
     trainer = Trainer(
         max_epochs=20000,

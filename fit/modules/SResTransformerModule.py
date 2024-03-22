@@ -106,14 +106,9 @@ class SResTransformerModule(LightningModule):
 
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        # x_fc = fc[:, self.dst_flatten_order][:, :-1]
-        # y_fc = fc[:, self.dst_flatten_order][:, 1:]
-
-        pred = self.sres.forward(fc)
-        # new_pred = fc[:, self.dst_flatten_order].copy()
-        # new_pred[:,1:,:] = pred
-        
-        
+        x_fc = fc[:, self.dst_flatten_order][:, :-1]
+        y_fc = fc[:, self.dst_flatten_order][:, 1:]
+        pred = self.sres.forward(x_fc)
 
         
         if self.loss == 'mse':
@@ -131,8 +126,7 @@ class SResTransformerModule(LightningModule):
             self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
             return {'loss': cce_loss}
 
-        # fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
-        fc_loss, amp_loss, phi_loss = self.criterion(pred, fc , mag_min, mag_max) #Tokeniser only loss
+        fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
 
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
         self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
@@ -141,12 +135,11 @@ class SResTransformerModule(LightningModule):
     
     def on_train_epoch_end(self):        
         loss = torch.mean(torch.tensor([x['loss'] for x in self.outputs]))
-        # amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
-        # phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
+        amp_loss = torch.mean(torch.tensor([x['amp_loss'] for x in self.outputs]))
+        phi_loss = torch.mean(torch.tensor([x['phi_loss'] for x in self.outputs]))
         self.log('Train/train_loss', loss, logger=True, on_epoch=True)
-
-        # self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
-        # self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
+        self.log('Train/train_amp_loss', amp_loss, logger=True, on_epoch=True)
+        self.log('Train/train_phi_loss', phi_loss, logger=True, on_epoch=True)
         self.outputs = []
         
 
