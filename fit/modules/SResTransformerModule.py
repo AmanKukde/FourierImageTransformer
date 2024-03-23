@@ -105,26 +105,26 @@ class SResTransformerModule(LightningModule):
         return fc_loss, amp_loss, phi_loss
 
     def training_step(self, batch, batch_idx):
-        fc, (mag_min, mag_max) = batch
-        x_fc = fc[:, self.dst_flatten_order][:, :-1]
+        fc, (mag_min, mag_max) = batch #378,2
+        x_fc = fc[:, self.dst_flatten_order][:, :-1] 
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
         pred = self.sres.forward(x_fc)
 
         
-        if self.loss == 'mse':
-            lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
-            mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
-            self.outputs.append({'loss': mse_loss})
-            self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
-            return {'loss': mse_loss}
+        # if self.loss == 'mse':
+        #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
+        #     mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
+        #     self.outputs.append({'loss': mse_loss})
+        #     self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
+        #     return {'loss': mse_loss}
         
-        if self.loss == 'cce':
-            lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
-            loss_func = torch.nn.CrossEntropyLoss()
-            cce_loss = loss_func(pred_img,gt_img)
-            self.outputs.append({'loss': cce_loss})
-            self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
-            return {'loss': cce_loss}
+        # if self.loss == 'cce':
+        #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
+        #     loss_func = torch.nn.CrossEntropyLoss()
+        #     cce_loss = loss_func(pred_img,gt_img)
+        #     self.outputs.append({'loss': cce_loss})
+        #     self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
+        #     return {'loss': cce_loss}
 
         fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
 

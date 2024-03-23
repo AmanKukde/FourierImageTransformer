@@ -55,9 +55,9 @@ class SResTransformerTrain(torch.nn.Module):
             x_hat = torch.tanh(self.fourier_coefficient_embedding(x))
             x_hat = self.pos_embedding(x_hat)
             padded_input[:,:input_seq_length] = x_hat
-            fast_mask = TriangularCausalMask(padded_input.shape[1], device=x.device)
+            # fast_mask = TriangularCausalMask(padded_input.shape[1], device=x.device)
             for i in range(input_seq_length,377):
-                y_hat = self.encoder(padded_input, mask=fast_mask)
+                y_hat = self.encoder(padded_input)#, mask=fast_mask)
                 padded_input[:,i,:] =  y_hat[:,i-1,:]  #97th element but 96th index
             output = padded_input
             y_amp = torch.tanh(self.predictor_amp(output))
@@ -74,12 +74,10 @@ class SResTransformerTrain(torch.nn.Module):
         self.predictor_phase.eval()
         with torch.no_grad():
             x_hat = torch.tanh(self.fourier_coefficient_embedding(x))
-            x_hat = self.pos_embedding(x_hat)
-
-            
+            x_hat = self.pos_embedding(x_hat)     
             print(x_hat.shape)
-            for i in range(input_seq_length,378):
-                y_hat = self.encoder(x_hat,)
+            for i in range(input_seq_length,377):
+                y_hat = self.encoder(x_hat)
                 x_hat = torch.cat([x_hat,y_hat[:,-1,:].unsqueeze(1)],dim = 1) #97th element but 96th index
                 # print(x_hat.shape)
             output = x_hat
