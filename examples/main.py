@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--subset_flag", type=bool, default=True)
-    parser.add_argument("--tokeniser_pretrained", type=bool, default=True)
+    parser.add_argument("--tokeniser_pretrained", type=bool, default=False)
     parser.add_argument("--tokeniser_freeze", type=bool, default=False)
 
     args = parser.parse_args()
@@ -123,8 +123,8 @@ if __name__ == "__main__":
     if tokeniser_freeze: 
         name += "_frozen"
 
-    # wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
-    wandb_logger = None
+    wandb_logger = WandbLogger(name = f'Run_{name}',project="Fourier Image Transformer",save_dir=f'/home/aman.kukde/Projects/FourierImageTransformer/models_saved/{name}',log_model="best",settings=wandb.Settings(code_dir="."))
+    # wandb_logger = None
 
     trainer = Trainer(
         max_epochs=20000,

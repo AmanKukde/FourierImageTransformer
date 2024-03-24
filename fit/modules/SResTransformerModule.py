@@ -106,9 +106,9 @@ class SResTransformerModule(LightningModule):
 
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch #378,2
-        x_fc = fc[:, self.dst_flatten_order][:, :-1] 
+        x_fc = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
-        pred = self.sres.forward(x_fc)
+        pred = self.sres.forward_i(x_fc,self.input_seq_length)
 
         
         # if self.loss == 'mse':
@@ -126,7 +126,7 @@ class SResTransformerModule(LightningModule):
         #     self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
         #     return {'loss': cce_loss}
 
-        fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
+        fc_loss, amp_loss, phi_loss = self.criterion(pred,fc , mag_min, mag_max)
 
         self.outputs.append({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss})
         self.log_dict({'loss': fc_loss, 'amp_loss': amp_loss, 'phi_loss': phi_loss},prog_bar=True,on_step=True)
