@@ -1,10 +1,19 @@
+# This file contains the implementation of the SResTransformer Module in pytorch Lightning
 import torch
+import torch.nn as nn
 from fit.transformers.masking import TriangularCausalMask,FullMask
 from fit.transformers.EncoderBlock import EncoderBlock
 from fit.transformers.RecurrentEncoderBlock import RecurrentEncoderBlock
 from fit.transformers.PositionalEncoding2D import PositionalEncoding2D
+class PositionwiseFeedForward(nn.Module):
+    def __init__(self, d_model, d_ff, dropout=0.1):
+        super(PositionwiseFeedForward, self).__init__()
+        self.w_1 = nn.Linear(d_model, d_ff)
+        self.w_2 = nn.Linear(d_ff, d_model)
+        self.dropout = nn.Dropout(dropout)
 
-
+    def forward(self, x):
+        return self.w_2(self.dropout(self.w_1(x).relu()))
 class SResTransformerTrain(torch.nn.Module):
     def __init__(self,
                  d_model,
@@ -25,22 +34,16 @@ class SResTransformerTrain(torch.nn.Module):
         ) 
 
         self.encoder = EncoderBlock(d_model=d_model,d_query = d_query, n_layers=n_layers, n_heads=n_heads, dropout = dropout,attention_dropout=attention_dropout)
-        
-        self.predictor_amp = torch.nn.Linear(
-            n_heads * d_query,
-            1
-        )
-        self.predictor_phase = torch.nn.Linear(
-            n_heads * d_query,
-            1
-        )
+       
+        self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)
+        self.predictor_phase = torch.nn.Linear(n_heads * d_query,1)
 
     def forward(self, x):
         x = torch.tanh(self.fourier_coefficient_embedding(x))  #shape = 377,2 --> 377,128
         x = self.pos_embedding(x) #shape 377,128 --> 377,256
         triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
         y_hat = self.encoder(x, mask=triangular_mask)
-        y_amp = torch.tanh(self.predictor_amp(y_hat))
+        y_amp = self.predictor_amp(y_hat)
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
@@ -50,7 +53,7 @@ class SResTransformerTrain(torch.nn.Module):
         # self.fourier_coefficient_embedding.eval()
         # self.predictor_amp.eval()
         # self.predictor_phase.eval()
-        padded_input = torch.zeros(x.shape[0],378,256).to(x.device)
+        padded_input = torch.zeros(x.shape[0],377,256).to(x.device)
         with torch.no_grad():
             x_hat = torch.tanh(self.fourier_coefficient_embedding(x))
             x_hat = self.pos_embedding(x_hat)
@@ -60,7 +63,7 @@ class SResTransformerTrain(torch.nn.Module):
                 y_hat = self.encoder(padded_input)#, mask=fast_mask)
                 padded_input[:,i,:] =  y_hat[:,i-1,:]  #97th element but 96th index
             output = padded_input
-            y_amp = torch.tanh(self.predictor_amp(output))
+            y_amp = self.predictor_amp(output)
             y_phase = torch.tanh(self.predictor_phase(output))
             # y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
             # y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)
@@ -79,9 +82,8 @@ class SResTransformerTrain(torch.nn.Module):
             for i in range(input_seq_length,377):
                 y_hat = self.encoder(x_hat)
                 x_hat = torch.cat([x_hat,y_hat[:,-1,:].unsqueeze(1)],dim = 1) #97th element but 96th index
-                # print(x_hat.shape)
             output = x_hat
-            y_amp = torch.tanh(self.predictor_amp(output))
+            y_amp = self.predictor_amp(output)
             y_phase = torch.tanh(self.predictor_phase(output))
             # y_amp[:,:input_seq_length] = x[:,:input_seq_length,0].unsqueeze(-1)
             # y_phase[:,:input_seq_length] = x[:,:input_seq_length,1].unsqueeze(-1)

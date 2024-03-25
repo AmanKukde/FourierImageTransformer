@@ -92,10 +92,10 @@ class SResTransformerModule(LightningModule):
 
     def configure_optimizers(self):
         optimizer = RAdam(self.sres.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, verbose=True)
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.25, verbose=True)
         return {
             'optimizer': optimizer,
-            # 'lr_scheduler': scheduler,
+            'lr_scheduler': scheduler,
             'monitor': 'Train/train_loss'
         }
 
@@ -109,22 +109,6 @@ class SResTransformerModule(LightningModule):
         x_fc = fc[:, self.dst_flatten_order][:, :-1]
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
         pred = self.sres.forward(x_fc)
-
-        
-        # if self.loss == 'mse':
-        #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
-        #     mse_loss = torch.mean(torch.pow((pred_img - gt_img),2))
-        #     self.outputs.append({'loss': mse_loss})
-        #     self.log_dict({'loss': mse_loss},prog_bar=True,on_step=True)
-        #     return {'loss': mse_loss}
-        
-        # if self.loss == 'cce':
-        #     lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc,pred = pred, mag_min=mag_min, mag_max=mag_max)
-        #     loss_func = torch.nn.CrossEntropyLoss()
-        #     cce_loss = loss_func(pred_img,gt_img)
-        #     self.outputs.append({'loss': cce_loss})
-        #     self.log_dict({'loss': cce_loss},prog_bar=True,on_step=True)
-        #     return {'loss': cce_loss}
 
         fc_loss, amp_loss, phi_loss = self.criterion(pred,y_fc , mag_min, mag_max)
 
@@ -151,7 +135,7 @@ class SResTransformerModule(LightningModule):
         # pred = self.sres.forward(x_fc)
 
         # val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
-        if batch_idx == 0:
+        if self.current_epoch%10 ==0 and batch_idx == 0:
             self.log_val_images(fc, mag_min, mag_max)
         
         # lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(fc=fc, mag_min=mag_min, mag_max=mag_max)
@@ -167,7 +151,8 @@ class SResTransformerModule(LightningModule):
         #              range(gt_img.shape[0])]))
         
         
-        self.val_outputs = { }#{'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss}
+        self.val_outputs = {}
+        #{'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss}
         #self.log_dict(self.val_outputs)
         return self.val_outputs
 
