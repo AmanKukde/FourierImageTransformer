@@ -1,14 +1,9 @@
-import sys
-sys.path.append('../')
-sys.path.append('./')
 from os.path import join, exists
 from typing import Optional, Union, List
 
 import numpy as np
 import torch
 import wget
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
@@ -30,6 +25,8 @@ class SResFITDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.gt_shape = gt_shape
         self.gt_ds = None
+        self.mean = None
+        self.std = None
         self.mag_min = None
         self.mag_max = None
 
@@ -43,21 +40,24 @@ class SResFITDataModule(LightningDataModule):
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+            batch_size=self.batch_size, num_workers=1)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-        return DataLoader(SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max), batch_size=self.batch_size, num_workers=0)
+        return DataLoader(
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max),
+            batch_size=self.batch_size, num_workers=1)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
                                           amp_max=self.mag_max),
-            batch_size=self.batch_size,num_workers=0)
+            batch_size=self.batch_size)
+
 
 class MNIST_SResFITDM(SResFITDataModule):
 
-    def __init__(self, root_dir, batch_size):
+    def __init__(self, root_dir, batch_size, subset_flag = False):
         """
         Uses the MNIST[1] dataset via the PyTorch API.
 
@@ -68,24 +68,26 @@ class MNIST_SResFITDM(SResFITDataModule):
             [1] Yann LeCun and Corinna Cortes.
             MNIST handwritten digit database. 2010.
         """
+        self.subset_flag = subset_flag
+        self.batch_size = batch_size
         super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=27)
 
-    def prepare_data(self,*args, **kwargs):
+    def prepare_data(self, *args, **kwargs):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
-        # np.random.seed(1612)
-        # perm = np.random.permutation(mnist_train_val.shape[0])
-        # mnist_train = mnist_train_val[:55000, 1:, 1:]
-        # mnist_val = mnist_train_val[55000:, 1:, 1:]
-
-        # if 'subset_flag' in  kwargs:
-        # #     if kwargs.get('subset_flag'):
-        mnist_train = mnist_train_val[114, 1:, 1:]
-        mnist_val = mnist_train_val[114, 1:, 1:]
-        mnist_train = torch.tile(mnist_train, (8,1,1))
-        mnist_val = torch.tile(mnist_val, (8,1,1))
-
-        mnist_test = mnist_test[:, 1:, 1:]
+        np.random.seed(1612)
+        if not self.subset_flag:
+            perm = np.random.permutation(mnist_train_val.shape[0])
+            mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
+            mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
+            mnist_test = mnist_test[:, 1:, 1:]
+        else:
+            perm = np.random.permutation(mnist_train_val.shape[0])
+            mnist_train = mnist_train_val[114, 1:, 1:]
+            mnist_train = torch.tile(mnist_train, (self.batch_size, 1, 1))
+            mnist_val = mnist_train.copy()
+            mnist_test = mnist_test[:, 1:, 1:]
+        
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
 
@@ -114,7 +116,7 @@ class CelebA_SResFITDM(SResFITDataModule):
 
     def prepare_data(self, *args, **kwargs):
         if not exists(join(self.root_dir, 'gt_data.npz')):
-            wget.download('https://download.fht.org/jug/fit/CelebA_SRes_gt_data.npz',
+            wget.download('https://cloud.mpi-cbg.de/index.php/s/Wtuy9IqUsSpjKav/download',
                           out=join(self.root_dir, 'gt_data.npz'))
 
         gt_data = np.load(join(self.root_dir, 'gt_data.npz'))
