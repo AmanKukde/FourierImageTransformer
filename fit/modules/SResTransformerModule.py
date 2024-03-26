@@ -10,7 +10,6 @@ from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
 from fit.utils.RAdam import RAdam
 import wandb
 import numpy as np
-# from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
 import torch.fft
 from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
 
@@ -134,7 +133,7 @@ class SResTransformerModule(LightningModule):
 
     def save_forward_func_output(self, pred,mag_min, mag_max):
         pred_img = self.convert2img(pred, mag_min, mag_max)
-        self.logger.experiment.log({f"Validation_Images/val_fwd_fnc_output":[wandb.Image(pred_img.cpu(), caption=f"pred_of_forward_menthod")],"global_step": self.trainer.global_step})
+        self.logger.experiment.log({f"Validation_Images/val_fwd_fnc_output":[wandb.Image(pred_img[0].cpu(), caption=f"pred_of_forward_menthod")],"global_step": self.trainer.global_step})
 
     def on_validation_epoch_end(self):
         val_loss = self.val_outputs['val_loss']

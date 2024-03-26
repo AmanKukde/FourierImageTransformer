@@ -82,10 +82,9 @@ class MNIST_SResFITDM(SResFITDataModule):
             mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
             mnist_test = mnist_test[:, 1:, 1:]
         else:
-            perm = np.random.permutation(mnist_train_val.shape[0])
             mnist_train = mnist_train_val[114, 1:, 1:]
             mnist_train = torch.tile(mnist_train, (self.batch_size, 1, 1))
-            mnist_val = mnist_train.copy()
+            mnist_val = mnist_train.clone()
             mnist_test = mnist_test[:, 1:, 1:]
         
         self.mean = mnist_train.mean()

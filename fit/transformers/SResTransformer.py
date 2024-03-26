@@ -53,6 +53,7 @@ class SResTransformer(torch.nn.Module):
             mask = triangular_mask.additive_matrix_finite
             if not causal: mask = None
             y_hat = self.encoder(x, mask=mask)
+        
         if self.model_type == 'fast':
             mask = triangular_mask
             if not causal: mask = None
