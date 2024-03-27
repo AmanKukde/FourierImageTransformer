@@ -66,10 +66,10 @@ class SResTransformer(torch.nn.Module):
     def forward_inference(self, x,input_seq_length, max_seq_length=377,causal = False):
         with torch.no_grad():
             x_hat = x
-            for i in range(input_seq_length,377):
+            for i in range(input_seq_length,378):
                 y_hat = self.forward(x_hat, causal = causal)
                 x_hat = torch.cat([x_hat,y_hat[:,-1,:].unsqueeze(1)],dim = 1)
-        assert x_hat.shape[1] == 377
+        assert x_hat.shape[1] == 378
         # x_hat[:,:input_seq_length] = x
         return x_hat
    

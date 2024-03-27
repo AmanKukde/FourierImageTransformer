@@ -85,10 +85,10 @@ class MNIST_SResFITDM(SResFITDataModule):
             mnist_test = mnist_test[:, 1:, 1:]
 
         else :
-            print("Using 1/10th MNIST dataset")
+            print("Using Full MNIST dataset")
             perm = np.random.permutation(mnist_train_val.shape[0])
-            mnist_train = mnist_train_val[perm[:5500], 1:, 1:]
-            mnist_val = mnist_train_val[perm[5500:6500], 1:, 1:]
+            mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
+            mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
             mnist_test = mnist_test[:, 1:, 1:]
             
         self.mean = mnist_train.mean()
@@ -134,3 +134,4 @@ class CelebA_SResFITDM(SResFITDataModule):
         gt_val = normalize(gt_val, self.mean, self.std)
         gt_test = normalize(gt_test, self.mean, self.std)
         self.gt_ds = GroundTruthDatasetFactory(gt_train, gt_val, gt_test)
+
