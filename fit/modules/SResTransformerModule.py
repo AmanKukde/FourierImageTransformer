@@ -124,7 +124,7 @@ class SResTransformerModule(LightningModule):
     
         val_loss, amp_loss, phi_loss = self.criterion(pred, y_fc, mag_min, mag_max)
 
-        if self.current_epoch%20 == 0 and batch_idx == 0:
+        if self.current_epoch%20 == 0 and batch_idx == 0 and self.logger._name != 'lightning_logs':
             self.save_forward_func_output(pred,mag_min, mag_max)
             self.log_val_images(fc, mag_min, mag_max)
         self.val_outputs = {'val_loss': val_loss, 'val_amp_loss': amp_loss, 'val_phi_loss': phi_loss}

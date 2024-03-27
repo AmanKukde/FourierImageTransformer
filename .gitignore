@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+
 # Distribution / packaging
 .Python
 build/
@@ -157,3 +158,4 @@ lightning_logs
 *.gitkeep
 *.gitignore
 *.json
+*.DS_Store

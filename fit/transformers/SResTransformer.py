@@ -45,7 +45,7 @@ class SResTransformer(torch.nn.Module):
         self.predictor_phase = torch.nn.Linear(n_heads * d_query,1)
 
     def forward(self, x,causal = True):
-        x = torch.tanh(self.fourier_coefficient_embedding(x))  #shape = 377,2 --> 377,128
+        x = self.fourier_coefficient_embedding(x) #shape = 377,2 --> 377,128
         x = self.pos_embedding(x) #shape 377,128 --> 377,256
         triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
         
@@ -70,6 +70,6 @@ class SResTransformer(torch.nn.Module):
                 y_hat = self.forward(x_hat, causal = causal)
                 x_hat = torch.cat([x_hat,y_hat[:,-1,:].unsqueeze(1)],dim = 1)
         assert x_hat.shape[1] == 377
-        x_hat[:,:input_seq_length] = x
+        # x_hat[:,:input_seq_length] = x
         return x_hat
    

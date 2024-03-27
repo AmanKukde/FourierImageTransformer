@@ -27,11 +27,11 @@ if __name__ == "__main__":
     parser.add_argument("--loss", type=str, help="loss", default="prod")
     parser.add_argument("--lr", type=float, help="Learning rate", default=0.0001)
     parser.add_argument("--model_type", type=str, help="Model to be used in the transformer (torch or fast)", default="torch")
-    parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=12)
+    parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=1)
     parser.add_argument("--n_heads", type=int, help="No of heads in the transformer", default=12)
     parser.add_argument("--n_shells",type=int,help="Number of shells used as lowres-input in the transformer",default=5)
-    parser.add_argument("--subset", type=bool, default=True)
-    parser.add_argument("--wandb", type=bool, default=True)
+    parser.add_argument("--subset_flag", action="store_true", help="Use subset of the dataset")
+    parser.add_argument("--wandb", action="store_true", help="Use wandb for logging", default=False)
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--models_save_path", type=str, default="/home/aman.kukde/Projects/FourierImageTransformer/models/")
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     note = args.note
     wandb_flag = args.wandb
     model_type = args.model_type
-    subset_flag = args.subset
+    subset_flag = args.subset_flag
     models_save_path = args.models_save_path
 
     dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32,subset_flag = subset_flag)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         num_shells=n_shells,
     )
     print(f"\n\n\n\n{model}\n\n\n\n")
-    name = str.capitalize(model_type) + f"_{loss}_{note}_" + datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
+    name = str.capitalize(model_type) + f"_{loss}_{note}_L_{n_layers}_H_{n_heads}_s_{n_shells}_subset_{subset_flag}_" + datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
     if wandb_flag:
         wandb_logger = WandbLogger(
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         wandb_logger = None
 
     trainer = Trainer(
-        max_epochs=100,
+        max_epochs=1000,
         logger=wandb_logger,
         enable_checkpointing=True,
         default_root_dir=f"{models_save_path}/{name}",
@@ -104,4 +104,4 @@ if __name__ == "__main__":
 
     trainer.fit(model, datamodule=dm)
     trainer.validate(model, datamodule=dm)
-    # trainer.test(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)

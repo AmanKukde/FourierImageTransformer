@@ -76,17 +76,21 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
         np.random.seed(1612)
-        if not self.subset_flag:
-            perm = np.random.permutation(mnist_train_val.shape[0])
-            mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
-            mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
-            mnist_test = mnist_test[:, 1:, 1:]
-        else:
+        
+        if self.subset_flag:
+            print("Using subset of MNIST dataset")
             mnist_train = mnist_train_val[114, 1:, 1:]
-            mnist_train = torch.tile(mnist_train, (self.batch_size, 1, 1))
+            mnist_train = torch.tile(mnist_train, (self.batch_size*100, 1, 1))
             mnist_val = mnist_train.clone()
             mnist_test = mnist_test[:, 1:, 1:]
-        
+
+        else :
+            print("Using 1/10th MNIST dataset")
+            perm = np.random.permutation(mnist_train_val.shape[0])
+            mnist_train = mnist_train_val[perm[:5500], 1:, 1:]
+            mnist_val = mnist_train_val[perm[5500:6500], 1:, 1:]
+            mnist_test = mnist_test[:, 1:, 1:]
+            
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
 
