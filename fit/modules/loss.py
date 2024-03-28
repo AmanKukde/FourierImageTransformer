@@ -24,7 +24,7 @@ def _fc_sum_loss(pred_fc, target_fc, amp_min, amp_max):
 
     amp_loss = torch.pow(pred_amp - target_amp, 2)
     phi_loss = 1 - torch.cos(pred_phi - target_phi)
-    return torch.mean(amp_loss + phi_loss), torch.mean(amp_loss), torch.mean(phi_loss)
+    return torch.mean(amp_loss + 100*phi_loss), torch.mean(amp_loss), torch.mean(phi_loss)
 
 def _fc_sum_loss_modified(pred_fc, target_fc, amp_min, amp_max):
     amp_loss = torch.pow(pred_fc[...,0] - target_fc[...,0], 2)

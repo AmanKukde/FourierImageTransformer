@@ -63,13 +63,14 @@ class SResTransformer(torch.nn.Module):
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
-    def forward_inference(self, x,input_seq_length, max_seq_length=377,causal = False):
+    def forward_inference(self, x,max_seq_length=378,causal = True): #(32,39,256)
         with torch.no_grad():
-            x_hat = x
-            for i in range(input_seq_length,378):
+            x_hat = x.clone()
+            for i in range(x.shape[1],max_seq_length):
                 y_hat = self.forward(x_hat, causal = causal)
                 x_hat = torch.cat([x_hat,y_hat[:,-1,:].unsqueeze(1)],dim = 1)
-        assert x_hat.shape[1] == 378
-        # x_hat[:,:input_seq_length] = x
+        print(x_hat[1].shape)
+        assert x_hat.shape[1] == max_seq_length
+        assert (x_hat[:,:x.shape[1]] == x).all()
         return x_hat
    

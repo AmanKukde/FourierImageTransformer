@@ -74,10 +74,10 @@ class SResTransformerModule(LightningModule):
 
     def configure_optimizers(self):
         optimizer = RAdam(self.sres.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, verbose=True)
+        # scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, verbose=True)
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'Validation/avg_val_loss'
         }
 
