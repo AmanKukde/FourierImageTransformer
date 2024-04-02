@@ -57,7 +57,6 @@ if __name__ == "__main__":
     r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
 
     model = SResTransformerModule(
-        d_model=n_heads * d_query,
         n_heads=n_heads,
         d_query=d_query,
         img_shape=dm.gt_shape,
@@ -69,8 +68,6 @@ if __name__ == "__main__":
         lr=lr,
         weight_decay=0.01,
         n_layers=n_layers,
-        dropout=0.1,
-        attention_dropout=0.1,
         num_shells=n_shells,
     )
     print(f"\n\n\n\n{model}\n\n\n\n")

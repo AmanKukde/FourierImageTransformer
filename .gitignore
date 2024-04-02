@@ -159,3 +159,4 @@ lightning_logs
 *.gitignore
 *.json
 *.DS_Store
+.DS_Store

@@ -14,23 +14,10 @@ import torch.fft
 from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
 
 class SResTransformerModule(LightningModule):
-    def __init__(self, d_model, img_shape,coords, dst_flatten_order, dst_order,loss='prod',model_type = 'fast',lr=0.0001,weight_decay=0.01,n_layers=4, n_heads=4,
-                d_query=32, dropout=0.1, attention_dropout=0.1,num_shells=4):
+    def __init__(self, img_shape, coords, dst_flatten_order, dst_order,loss='prod',model_type = 'fast',lr=0.0001,weight_decay=0.01,n_layers=4, n_heads=4,
+                d_query=32,num_shells=4,attention_dropout=0.1,dropout=0.1):
         super().__init__()
-        self.outputs = []
-        self.save_hyperparameters("model_type",
-                                  "d_model",
-                                  "img_shape",
-                                  "loss",
-                                  "lr",
-                                  "weight_decay",
-                                  "n_layers",
-                                  "n_heads",
-                                  "d_query",
-                                  "dropout",
-                                  "attention_dropout",
-                                  "num_shells")
-
+        
         self.model_type = model_type
         self.coords = coords
         self.dst_flatten_order = dst_flatten_order
@@ -42,6 +29,18 @@ class SResTransformerModule(LightningModule):
         self.shells = num_shells
         self.n_layers = n_layers
         self.loss = loss
+
+        self.save_hyperparameters("model_type",
+                                  "img_shape",
+                                  "loss",
+                                  "lr",
+                                  "weight_decay",
+                                  "n_layers",
+                                  "n_heads",
+                                  "d_query",
+                                  "num_shells",
+                                  "attention_dropout",
+                                  "dropout")
         
         # Set the loss function based on the input loss type
         if loss == 'prod':
@@ -53,7 +52,10 @@ class SResTransformerModule(LightningModule):
         elif loss == 'sum_modified':
             self.loss = _fc_sum_loss_modified
 
-        self.sres = SResTransformer(d_model=self.hparams.d_model,
+        self.outputs = [] #for storing outputs of training step
+
+        # Initialize the SResTransformer Model
+        self.sres = SResTransformer(d_model=self.hparams.n_heads * self.hparams.d_query,
                                     coords=self.coords,
                                     flatten_order=self.dst_flatten_order,
                                     attention_type='full',
