@@ -62,14 +62,14 @@ class TomoFITDataModule(LightningDataModule):
             TRecFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'),
                                           angles=self.gt_ds.ray_trafo.geometry.angles, mag_min=self.mag_min,
                                           mag_max=self.mag_max, img_shape=self.gt_shape),
-            batch_size=self.batch_size, num_workers=1)
+            batch_size=self.batch_size, num_workers=0)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             TRecFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'),
                                           angles=self.gt_ds.ray_trafo.geometry.angles, mag_min=self.mag_min,
                                           mag_max=self.mag_max, img_shape=self.gt_shape),
-            batch_size=self.batch_size, num_workers=1)
+            batch_size=self.batch_size, num_workers=0)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
