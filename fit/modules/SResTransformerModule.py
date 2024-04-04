@@ -3,10 +3,10 @@ import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from fit.modules.loss import _fc_prod_loss, _fc_sum_loss,_fc_sum_loss_modified,_fc_prod_loss_modified
-from fit.transformers.SResTransformer import SResTransformer
-from fit.utils import denormalize_FC, PSNR, convert2DFT
-from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
+from fit.modules.loss import _fc_prod_loss, _fc_sum_loss
+from fit.transformers_fit.SResTransformer import SResTransformer
+from fit.utils.utils import convert2DFT
+from fit.utils.PSNR import RangeInvariantPsnr as PSNR
 from fit.utils.RAdam import RAdam
 import wandb
 import numpy as np
@@ -47,10 +47,6 @@ class SResTransformerModule(LightningModule):
             self.loss = _fc_prod_loss
         elif loss == 'sum':
             self.loss = _fc_sum_loss
-        elif loss == 'prod_modified':
-            self.loss = _fc_prod_loss_modified
-        elif loss == 'sum_modified':
-            self.loss = _fc_sum_loss_modified
 
         self.outputs = [] #for storing outputs of training step
 
@@ -85,7 +81,7 @@ class SResTransformerModule(LightningModule):
 
     def criterion(self, pred_fc, target_fc, mag_min, mag_max):
         fc_loss, amp_loss, phi_loss = self.loss(pred_fc=pred_fc, target_fc=target_fc, amp_min=mag_min,
-                                                amp_max=mag_max)
+                                                amp_max=mag_max,w_phi = 100)
         return fc_loss, amp_loss, phi_loss
 
     def training_step(self, batch, batch_idx):

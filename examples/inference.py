@@ -19,7 +19,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from fit.transformers.PSNR import RangeInvariantPsnr as PSNR
+from utils.PSNR import RangeInvariantPsnr as PSNR
 
 ssl._create_default_https_context = ssl._create_unverified_context
 torch.set_float32_matmul_precision("medium")
