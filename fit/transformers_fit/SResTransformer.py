@@ -1,26 +1,10 @@
 # This file contains the implementation of the SResTransformer Module in pytorch Lightning
 import torch
 from fit.transformers_fit.PositionalEncoding2D import PositionalEncoding2D
-from transformers import MambaConfig
-from transformers.models.mamba.modeling_mamba import MambaBlock
-
-
-class NewMamba(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        conf = MambaConfig()
-        conf.num_hidden_layers = 8
-        conf.expand = 4
-        conf.hidden_size = 256
-        # conf.state_size = 32
-        conf.intermediate_size = 512
-        self.layers = torch.nn.ModuleList([MambaBlock(conf, layer_idx=x) for x in range(8)])
-
-    def forward(self, x):
-        for block in self.layers:
-            x = block(x)
-        return x
-    
+from fast_transformers.masking import TriangularCausalMask
+from fast_transformers.builders import TransformerEncoderBuilder
+from transformers import MambaConfig,MambaModel
+   
 class SResTransformer(torch.nn.Module):
     def __init__(self,
                  d_model,
@@ -41,8 +25,30 @@ class SResTransformer(torch.nn.Module):
             flatten_order=flatten_order,
             persistent=False
         ) 
-        # Source: Mamba Repository
-        self.encoder = NewMamba()
+        self.model_type = model_type
+
+        if self.model_type == 'mamba':
+            conf = MambaConfig()
+            conf.num_hidden_layers = 8
+            conf.expand = 4
+            conf.hidden_size = 256
+            conf.intermediate_size = 512
+            self.encoder = MambaModel(conf)
+
+        if self.model_type == 'torch':
+            self.encoder = torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(d_model=n_heads * d_query, nhead=n_heads,batch_first=True), num_layers=n_layers)
+        if self.model_type == 'fast' :
+            self.encoder = TransformerEncoderBuilder.from_kwargs(
+                attention_type=attention_type,
+                n_layers=n_layers,
+                n_heads=n_heads,
+                feed_forward_dimensions=n_heads * d_query * 4,
+                query_dimensions=d_query,
+                value_dimensions=d_query,
+                dropout=dropout,
+                attention_dropout=attention_dropout
+            ).get() 
+
         self.encoder.to('cuda')
         
         self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)
@@ -53,19 +59,20 @@ class SResTransformer(torch.nn.Module):
         x = self.pos_embedding(x) #shape 377,128 --> 377,256
         
         if self.model_type == 'mamba':
-            y_hat = self.encoder(x)
+            y_hat = self.encoder(inputs_embeds = x)
+            y_hat = y_hat.last_hidden_state
         
-        # if self.model_type == 'torch':
-        #     triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
-        #     mask = triangular_mask.additive_matrix_finite
-        #     if not causal: mask = None
-        #     y_hat = self.encoder(x, mask=mask)
+        if self.model_type == 'torch':
+            triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
+            mask = triangular_mask.additive_matrix_finite
+            if not causal: mask = None
+            y_hat = self.encoder(x, mask=mask)
         
-        # if self.model_type == 'fast':
-        #     triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
-        #     mask = triangular_mask
-        #     if not causal: mask = None
-        #     y_hat = self.encoder(x, attn_mask=mask)
+        if self.model_type == 'fast':
+            triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
+            mask = triangular_mask
+            if not causal: mask = None
+            y_hat = self.encoder(x, attn_mask=mask)
 
         y_amp = self.predictor_amp(y_hat)
         y_phase = torch.tanh(self.predictor_phase(y_hat))

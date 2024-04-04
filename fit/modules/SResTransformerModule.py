@@ -81,7 +81,7 @@ class SResTransformerModule(LightningModule):
 
     def criterion(self, pred_fc, target_fc, mag_min, mag_max):
         fc_loss, amp_loss, phi_loss = self.loss(pred_fc=pred_fc, target_fc=target_fc, amp_min=mag_min,
-                                                amp_max=mag_max,w_phi = 100)
+                                                amp_max=mag_max,w_phi = 1)
         return fc_loss, amp_loss, phi_loss
 
     def training_step(self, batch, batch_idx):
