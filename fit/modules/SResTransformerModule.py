@@ -15,7 +15,7 @@ from fit.utils.utils import denormalize, denormalize_amp, denormalize_phi
 
 class SResTransformerModule(LightningModule):
     def __init__(self, img_shape, coords, dst_flatten_order, dst_order,loss='prod',model_type = 'fast',lr=0.0001,weight_decay=0.01,n_layers=4, n_heads=4,
-                d_query=32,num_shells=4,attention_dropout=0.1,dropout=0.1):
+                d_query=32,num_shells=4,attention_dropout=0.1,dropout=0.1,w_phi=1):
         super().__init__()
         
         self.model_type = model_type
@@ -29,6 +29,7 @@ class SResTransformerModule(LightningModule):
         self.shells = num_shells
         self.n_layers = n_layers
         self.loss = loss
+        self.w_phi = w_phi
 
         self.save_hyperparameters("model_type",
                                   "img_shape",
@@ -76,7 +77,7 @@ class SResTransformerModule(LightningModule):
         return {
             'optimizer': optimizer,
             # 'lr_scheduler': scheduler,
-            'monitor': 'Validation/avg_val_loss'
+            'monitor': 'Validation/avg_val_phi_loss'
         }
 
     def criterion(self, pred_fc, target_fc, mag_min, mag_max):

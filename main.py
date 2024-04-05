@@ -33,7 +33,9 @@ if __name__ == "__main__":
     parser.add_argument("--subset_flag", action="store_true", help="Use subset of the dataset")
     parser.add_argument("--wandb", action="store_true", help="Use wandb for logging", default=True)
     parser.add_argument("--note", type=str, help="note", default="")
+    parser.add_argument("--w_phi", type=float, help="Weight for phi loss", default=1)
     parser.add_argument("--models_save_path", type=str, default="/home/aman.kukde/Projects/FourierImageTransformer/models/")
+    parser.add_argument("--resume_training_from_checkpoint", type=str, default=None)
 
 
     args = parser.parse_args()
@@ -49,6 +51,8 @@ if __name__ == "__main__":
     model_type = args.model_type
     subset_flag = args.subset_flag
     models_save_path = args.models_save_path
+    w_phi = args.w_phi
+    resume_training_from_checkpoint = args.resume_training_from_checkpoint
 
     dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32,subset_flag = subset_flag)
     dm.prepare_data()
@@ -69,6 +73,7 @@ if __name__ == "__main__":
         weight_decay=0.01,
         n_layers=n_layers,
         num_shells=n_shells,
+        w_phi=w_phi
     )
     print(f"\n\n\n\n{model}\n\n\n\n")
     name = str.capitalize(model_type) + f"_{loss}_{note}_L_{n_layers}_H_{n_heads}_s_{n_shells}_subset_{subset_flag}_" + datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
@@ -86,15 +91,17 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         max_epochs=1000,
+        
         logger=wandb_logger,
         enable_checkpointing=True,
         default_root_dir=f"{models_save_path}/{name}",
         callbacks=ModelCheckpoint(
+            resume_from_checkpoint=resume_training_from_checkpoint,
             dirpath=f"{models_save_path}/{name}",
             save_top_k=1,
             verbose=False,
             save_last=True, 
-            monitor="Validation/avg_val_loss",
+            monitor="Validation/avg_val_phi_loss",
             mode="min",
         ),
     )

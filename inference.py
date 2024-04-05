@@ -5,8 +5,6 @@ import torch
 import wandb
 import ssl
 import datetime
-import matplotlib
-from tqdm import tqdm
 
 from fit.utils.tomo_utils import get_polar_rfft_coords_2D
 from fit.modules.SResTransformerModule import SResTransformerModule
@@ -15,12 +13,10 @@ from fit.datamodules.super_res.SResDataModule import MNIST_SResFITDM, CelebA_SRe
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
-
-import matplotlib.pyplot as plt
 import seaborn as sns
-
-from utils.PSNR import RangeInvariantPsnr as PSNR
-
+import matplotlib.pyplot as plt
+from fit.utils.PSNR import RangeInvariantPsnr as PSNR
+from tqdm import tqdm
 ssl._create_default_https_context = ssl._create_unverified_context
 torch.set_float32_matmul_precision("medium")
 seed_everything(22122020)
@@ -29,27 +25,41 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--causal_mask", action="store_true", help="Use causal mask", default=True)
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
-    parser.add_argument("--model_type", type=str, help="Model to be used in the transformer (torch or fast)", default="fast")
+    parser.add_argument("--dataset", type=str, help="Dataset to be used", default="MNIST")
+    parser.add_argument("--loss", type=str, help="loss", default="prod")
+    parser.add_argument("--lr", type=float, help="Learning rate", default=0.0001)
+    parser.add_argument("--model_type", type=str, help="Model to be used in the transformer (torch or fast or mamba)", default="mamba")
     parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=8)
     parser.add_argument("--n_heads", type=int, help="No of heads in the transformer", default=8)
     parser.add_argument("--n_shells",type=int,help="Number of shells used as lowres-input in the transformer",default=5)
+    parser.add_argument("--subset_flag", action="store_true", help="Use subset of the dataset")
+    parser.add_argument("--wandb", action="store_true", help="Use wandb for logging", default=True)
+    parser.add_argument("--note", type=str, help="note", default="")
+    parser.add_argument("--w_phi", type=float, help="Weight for phi loss", default=1)
     parser.add_argument("--models_save_path", type=str, default="/home/aman.kukde/Projects/FourierImageTransformer/models/")
-    parser.add_argument("--model_name", type=str, default= 'Fast_prod__L_8_H_8_s_5_subset_False_27-03_16-58-36/epoch=222-step=383337.ckpt')
+    parser.add_argument("--model_name", type=str, help="Name of the model to be loaded", default="Mamba_prod_W_phi_100_L_8_H_8_s_5_subset_False_04-04_17-02-10/epoch=506-step=871533.ckpt")
+    parser.add_argument("--resume_training_from_checkpoint", type=str, default=None)
+
 
     args = parser.parse_args()
-
     n_layers = args.n_layers
+    lr = args.lr
     n_shells = args.n_shells
     n_heads = args.n_heads
-    model_type = args.model_type
-    models_save_path = args.models_save_path
-    model_name = args.model_name
-    causal_mask = args.causal_mask
+    dataset = args.dataset
+    loss = args.loss
     d_query = args.d_query
+    note = args.note
+    wandb_flag = args.wandb
+    model_type = args.model_type
+    subset_flag = args.subset_flag
+    models_save_path = args.models_save_path
+    w_phi = args.w_phi
+    resume_training_from_checkpoint = args.resume_training_from_checkpoint
+    model_name = args.model_name
 
-    dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32)
+    dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32,subset_flag = subset_flag)
     dm.prepare_data()
     dm.setup()
 
@@ -63,10 +73,14 @@ if __name__ == "__main__":
         model_type=model_type,
         dst_flatten_order=flatten_order,
         dst_order=order,
+        loss=loss,
+        lr=lr,
         weight_decay=0.01,
         n_layers=n_layers,
         num_shells=n_shells,
+        w_phi=w_phi
     )
+
     print(f"\n\n\n\n{model}\n\n\n\n")
     weights = torch.load(models_save_path + model_name)['state_dict']
     model.load_state_dict(weights)
@@ -90,20 +104,20 @@ def make_figs(lowres_psnr, pred_psnr):
     sns.histplot(lowres_psnr.cpu().detach(), kde=True, color='blue',legend =True,label = "lowres")
     sns.histplot(pred_psnr.cpu().detach(), kde=True, color='red', legend= True, label = "pred")
     fig.legend()
-    plt.savefig('./inference_results/psnr_hist.png')
+    plt.savefig('./inference_results/mamba_psnr_hist.png')
     plt.close()
 
     fig = plt.figure()
     sns.histplot(pred_psnr.cpu().detach() - lowres_psnr.cpu().detach(), kde=True, color='green', legend= True, label = "diff")
     fig.legend()
-    plt.savefig('./inference_results/psnr_diff.png')
+    plt.savefig('./inference_results/mamba_psnr_diff.png')
     plt.close()
 
     fig = plt.figure()
     sns.boxplot(lowres_psnr.cpu().detach(), color='blue',legend = True)
     fig.legend(["lowres"])
     sns.boxplot(pred_psnr.cpu().detach(), color='red',legend = True)
-    plt.savefig('./inference_results/psnr_box.png')
+    plt.savefig('./inference_results/mamba_psnr_box.png')
     plt.close()
     return None
 
@@ -131,8 +145,8 @@ for fc, (mag_min, mag_max) in tqdm(dm.test_dataloader()):
     make_figs(torch.concat(lowres_psnr), torch.concat(pred_psnr))
 lowres_psnr = torch.concat(lowres_psnr)
 pred_psnr = torch.concat(pred_psnr)
-torch.save(lowres_psnr, './inference_results/lowres.pt')
-torch.save(pred_psnr,'./inference_results/pred.pt')
+torch.save(lowres_psnr, './inference_results/mamba_lowres.pt')
+torch.save(pred_psnr,'./inference_results/mamba_pred.pt')
 
 
 
