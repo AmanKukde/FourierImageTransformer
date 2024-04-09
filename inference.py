@@ -1,159 +1,206 @@
 import sys
-sys.path.append("./")
+sys.path.append('../')
+from fit.datamodules.super_res import MNIST_SResFITDM, CelebA_SResFITDM
+from fit.utils.tomo_utils import get_polar_rfft_coords_2D
+
+from fit.modules.SResTransformerModule import SResTransformerModule
 
 import torch
-import wandb
-import ssl
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib
+from tqdm import tqdm
+from fit.utils.PSNR import RangeInvariantPsnr as PSNR
 import datetime
-
-from fit.utils.tomo_utils import get_polar_rfft_coords_2D
-from fit.modules.SResTransformerModule import SResTransformerModule
-from fit.datamodules.super_res.SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM
-
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import ModelCheckpoint
+import torch
+import numpy as np
+from pytorch_lightning import seed_everything
+from pathlib import Path
 import seaborn as sns
 import matplotlib.pyplot as plt
-from fit.utils.PSNR import RangeInvariantPsnr as PSNR
-from tqdm import tqdm
-ssl._create_default_https_context = ssl._create_unverified_context
-torch.set_float32_matmul_precision("medium")
-seed_everything(22122020)
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--d_query", type=int, help="d_query", default=32)
-    parser.add_argument("--dataset", type=str, help="Dataset to be used", default="MNIST")
-    parser.add_argument("--loss", type=str, help="loss", default="prod")
-    parser.add_argument("--lr", type=float, help="Learning rate", default=0.0001)
-    parser.add_argument("--model_type", type=str, help="Model to be used in the transformer (torch or fast or mamba)", default="mamba")
-    parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=8)
-    parser.add_argument("--n_heads", type=int, help="No of heads in the transformer", default=8)
-    parser.add_argument("--n_shells",type=int,help="Number of shells used as lowres-input in the transformer",default=5)
-    parser.add_argument("--subset_flag", action="store_true", help="Use subset of the dataset")
-    parser.add_argument("--wandb", action="store_true", help="Use wandb for logging", default=True)
-    parser.add_argument("--note", type=str, help="note", default="")
-    parser.add_argument("--w_phi", type=float, help="Weight for phi loss", default=1)
-    parser.add_argument("--models_save_path", type=str, default="/home/aman.kukde/Projects/FourierImageTransformer/models/")
-    parser.add_argument("--model_name", type=str, help="Name of the model to be loaded", default="Mamba_prod_W_phi_100_L_8_H_8_s_5_subset_False_04-04_17-02-10/epoch=506-step=871533.ckpt")
-    parser.add_argument("--resume_training_from_checkpoint", type=str, default=None)
 
 
-    args = parser.parse_args()
-    n_layers = args.n_layers
-    lr = args.lr
-    n_shells = args.n_shells
-    n_heads = args.n_heads
-    dataset = args.dataset
-    loss = args.loss
-    d_query = args.d_query
-    note = args.note
-    wandb_flag = args.wandb
-    model_type = args.model_type
-    subset_flag = args.subset_flag
-    models_save_path = args.models_save_path
-    w_phi = args.w_phi
-    resume_training_from_checkpoint = args.resume_training_from_checkpoint
-    model_name = args.model_name
+class Inference:
+    def __init__(self, ckpt_path_list,save_folder):
+        self.ckpt_path_list = ckpt_path_list
+        self.save_folder = save_folder
 
-    dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32,subset_flag = subset_flag)
-    dm.prepare_data()
-    dm.setup()
+    def run_inference(self):
+        for path in self.ckpt_path_list:
+            model_type,model, dataset, dm, flatten_order = self._load_model_from_ckpt_path(ckpt_path=path)
+            Path(self.save_folder+f"/{model_type}_{self.dataset}/{datetime.datetime.now().strftime('%m_%d_%H_%M')}").mkdir(parents=True, exist_ok=True)
+            self.test_model_save_pred_psnr(model_type, model, dm, flatten_order,save_location = f'{self.save_folder}/{model_type}_{dataset}')
 
-    r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
+    def _load_model_from_ckpt_path(self,ckpt_path):    
+        ckpt_path = ckpt_path
+        dataset = ckpt_path.split('/')[-5]
+        model_type = ckpt_path.split('/')[-4]
+        seed_everything(22122020)
 
-    model = SResTransformerModule(
-        n_heads=n_heads,
-        d_query=d_query,
-        img_shape=dm.gt_shape,
-        coords=(r, phi),
-        model_type=model_type,
-        dst_flatten_order=flatten_order,
-        dst_order=order,
-        loss=loss,
-        lr=lr,
-        weight_decay=0.01,
-        n_layers=n_layers,
-        num_shells=n_shells,
-        w_phi=w_phi
-    )
+        if dataset == "MNIST":
+            dm = MNIST_SResFITDM(root_dir="./datamodules/data/",
+                                    batch_size=32, subset_flag=False)
+        if dataset == "CelebA":
+            dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
+                                    batch_size=8, subset_flag=False)
+        dm.prepare_data()
+        dm.setup()
 
-    print(f"\n\n\n\n{model}\n\n\n\n")
-    weights = torch.load(models_save_path + model_name)['state_dict']
-    model.load_state_dict(weights)
-    print(f"Model loaded successfully {model_name}")
+        r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
+        n_heads = 8
+        d_query = 32
+        model = SResTransformerModule(img_shape=dm.gt_shape,
+                                    coords=(r, phi),
+                                    dst_flatten_order=flatten_order,
+                                    dst_order=order,
+                                    lr=0.0001, weight_decay=0.01, n_layers=8,
+                                    n_heads=n_heads, d_query=d_query,num_shells = 5,
+                                    model_type = self.model_type)
 
-    trainer = Trainer(max_epochs=100, 
-                    callbacks=ModelCheckpoint(
-                                                dirpath=None,
-                                                save_top_k=1,
-                                                verbose=False,
-                                                save_last=True,
-                                                monitor='Validation/avg_val_loss',
-                                                mode='min'
-                                            ), 
-                    deterministic=True)
+        weights = torch.load(self.ckpt_path)['state_dict']
+        model.load_state_dict(weights, strict=True)
+        model.cuda()
+        model.eval()
+        print('Model Loaded')
+        return model_type, model, dm, flatten_order
 
-    model.cuda()
+    def test_model_save_pred_psnr(self, model_type, model, dm, flatten_order):
+        lowres_psnr = []
+        pred_psnr = []
+        for fc, (mag_min, mag_max) in tqdm(dm.test_dataloader()):
+            fc = fc.cuda()
+            mag_min = mag_min.cuda()
+            mag_max = mag_max.cuda()
+            x_fc = fc[:, flatten_order][:, :model.input_seq_length].cuda()
+            pred = model.sres.forward_inference(x_fc)
 
-def make_figs(lowres_psnr, pred_psnr):
-    fig = plt.figure()
-    sns.histplot(lowres_psnr.cpu().detach(), kde=True, color='blue',legend =True,label = "lowres")
-    sns.histplot(pred_psnr.cpu().detach(), kde=True, color='red', legend= True, label = "pred")
-    fig.legend()
-    plt.savefig('./inference_results/mamba_psnr_hist.png')
-    plt.close()
+            pred_img = model.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
 
-    fig = plt.figure()
-    sns.histplot(pred_psnr.cpu().detach() - lowres_psnr.cpu().detach(), kde=True, color='green', legend= True, label = "diff")
-    fig.legend()
-    plt.savefig('./inference_results/mamba_psnr_diff.png')
-    plt.close()
+            lowres = torch.zeros_like(pred)
+            lowres += fc.min()
+            lowres[:, :model.input_seq_length] = fc[:, model.dst_flatten_order][:, :model.input_seq_length]
+            lowres_img = model.convert2img(fc=lowres, mag_min=mag_min, mag_max=mag_max)
+            gt_img = model.convert2img(fc=fc[:, model.dst_flatten_order], mag_min=mag_min, mag_max=mag_max)
 
-    fig = plt.figure()
-    sns.boxplot(lowres_psnr.cpu().detach(), color='blue',legend = True)
-    fig.legend(["lowres"])
-    sns.boxplot(pred_psnr.cpu().detach(), color='red',legend = True)
-    plt.savefig('./inference_results/mamba_psnr_box.png')
-    plt.close()
-    return None
+            lowres_psnr.append(PSNR(gt_img,lowres_img))
+            pred_psnr.append(PSNR(gt_img,pred_img))
 
-lowres_psnr = []
-pred_psnr = []
+        lowres_psnr = torch.concat(lowres_psnr)
+        pred_psnr = torch.concat(pred_psnr)
+        torch.save(lowres_psnr, f'{self.save_folder}/{model_type}_lowres.pt')
+        torch.save(pred_psnr,f'{self.save_folder}/{model_type}_pred.pt')
+        return lowres_psnr, pred_psnr
+
+    def make_figs_individual(self,input_dict,save_folder, show = False):
+        font = {'family' : 'serif',
+            'weight': 'normal',
+            'size'   : 16}
+        matplotlib.rc('font', **font)
+        #Indivitual models
+        for id in input_dict.keys():
+            lowres_psnr,pred_psnr = input_dict[id]
+            fig = plt.figure(figsize = (12,9))
+            sns.histplot(lowres_psnr.cpu().detach(), kde=True, color='blue',legend =True,label = "lowres")
+            sns.histplot(pred_psnr.cpu().detach(), kde=True, color='red', legend= True, label = "pred")
+            fig.legend()
+            plt.savefig(f'{save_folder}/{id}_psnr_hist.png')
+            if show:plt.show()
+            plt.close()
+
+            fig = plt.figure(figsize = (12,9))
+            sns.histplot(pred_psnr.cpu().detach() - lowres_psnr.cpu().detach(), kde=True, color='green', legend= True, label = "diff")
+            fig.legend()
+            plt.savefig(f'{save_folder}/{id}_psnr_diff.png')
+            if show:plt.show()
+            plt.close()
+
+            plt.figure(figsize = (12,9));
+            plt.boxplot([lowres_psnr,pred_psnr,pred_psnr - lowres_psnr],widths = [0.9]*3,labels = ['lowres_psnr','pred_psnr', 'diff (pred - lowres)']);
+            plt.savefig(f'{save_folder}/{id}_psnr_box_LvsPvsD.png');
+            if show:plt.show()
+            plt.close()
+
+            plt.figure(figsize = (12,9));
+            plt.boxplot([lowres_psnr,pred_psnr],widths = [0.9]*2,labels = ['lowres_psnr','pred_psnr']);
+            plt.savefig(f'{save_folder}/{id}_psnr_box_LvsP.png');
+            if show:plt.show()
+            plt.close()
+
+            plt.figure(figsize = (12,9));
+            plt.boxplot([pred_psnr - lowres_psnr],widths = [0.9],labels = ['diff (pred - lowres)']);
+            plt.savefig(f'{save_folder}/{id}_psnr_box_diff.png');
+            if show:plt.show()
+            plt.close()
+
+            diff = np.sort(pred_psnr - lowres_psnr)
+            p = np.arange(0, 101, 1)
+            xt = np.arange(0, 105, 5)
+            perc = np.percentile(diff, q=p)
+            plt.figure(figsize=(10,10))
+            plt.plot(diff, label='PSNR Difference Prediction - Lowres')
+            plt.plot((len(diff)+1) * p/100., perc, 'ro',label = '+1 Percentile of PSNR Difference Distribution')
+            plt.xticks((len(diff)-1) * xt/100., map(str, xt))
+            plt.legend()
+            plt.grid()
+            plt.savefig(f'{save_folder}/{id}_psnr_diff_percentile.png')
+            if show:plt.show()
+            plt.close()
+    def make_figs_comparison(self,input_dict,save_folder, show = False):
+        font = {'family' : 'serif',
+            'weight': 'normal',
+            'size'   : 16}
+        matplotlib.rc('font', **font)
+        #Comparison models
+        fig = plt.figure(figsize = (12,9))
+        for id in input_dict.keys():
+            lowres_psnr,pred_psnr = input_dict[id]
+            sns.histplot(lowres_psnr.cpu().detach(), kde=True,legend =True,label = f'{id}_lowres')
+            sns.histplot(pred_psnr.cpu().detach(), kde=True, legend= True, label = f'{id}_pred')
+        fig.legend()
+        plt.savefig(f'{save_folder}/Comparison_psnr_hist.png')
+        if show:plt.show()
+        plt.close()
+
+        fig = plt.figure(figsize = (12,9))
+        for id in input_dict.keys():
+            lowres_psnr,pred_psnr = input_dict[id]
+            sns.histplot(pred_psnr.cpu().detach() - lowres_psnr.cpu().detach(), kde=True, legend= True, label = f"{id}_diff")
+        fig.legend()
+        plt.savefig(f'{save_folder}/Comparison_psnr_diff.png')
+        if show:plt.show()
+        plt.close()
 
 
-for fc, (mag_min, mag_max) in tqdm(dm.test_dataloader()):
-    fc = fc.cuda()
-    mag_min = mag_min.cuda()
-    mag_max = mag_max.cuda()
-    x_fc = fc[:, flatten_order][:, :model.input_seq_length].cuda()
-    pred = model.sres.forward_inference(x_fc)
+        plt.figure(figsize = (12,9));
+        diff = {}
+        for id in input_dict.keys():
+            lowres_psnr,pred_psnr = input_dict[id]
+            diff[id] = (pred_psnr - lowres_psnr).cpu().detach().numpy()
 
-    pred_img = model.convert2img(fc=pred, mag_min=mag_min, mag_max=mag_max)
- 
-    lowres = torch.zeros_like(pred)
-    lowres += fc.min()
-    lowres[:, :model.input_seq_length] = fc[:, model.dst_flatten_order][:, :model.input_seq_length]
-    lowres_img = model.convert2img(fc=lowres, mag_min=mag_min, mag_max=mag_max)
-    gt_img = model.convert2img(fc=fc[:, model.dst_flatten_order], mag_min=mag_min, mag_max=mag_max)
-
-    lowres_psnr.append(PSNR(gt_img,lowres_img))
-    pred_psnr.append(PSNR(gt_img,pred_img))
-    make_figs(torch.concat(lowres_psnr), torch.concat(pred_psnr))
-lowres_psnr = torch.concat(lowres_psnr)
-pred_psnr = torch.concat(pred_psnr)
-torch.save(lowres_psnr, './inference_results/mamba_lowres.pt')
-torch.save(pred_psnr,'./inference_results/mamba_pred.pt')
+        plt.boxplot([diff[key] for key in diff.keys()],widths = [0.9]*len(diff.keys()),labels = [f"{key}_psnr" for key in diff.keys()]);
+        plt.savefig(f'{save_folder}/Comparison_psnr_box.png');
+        if show:plt.show()
+        plt.close()
 
 
+        diff = np.sort(pred_psnr - lowres_psnr)
+        p = np.arange(0, 101, 1)
+        xt = np.arange(0, 105, 5)
+        perc = np.percentile(diff, q=p)
+        plt.figure(figsize=(10,10))
+        for id in input_dict.keys():
+            lowres_psnr,pred_psnr = input_dict[id]
+            plt.plot(diff, label='PSNR Difference Prediction - Lowres')
+            plt.plot((len(diff)+1) * p/100., perc, 'o',label = f'{id}_+1 Percentile of PSNR Difference Distribution')
+            plt.xticks((len(diff)-1) * xt/100., map(str, xt))
+        plt.legend()
+        plt.grid()
+        plt.savefig(f'{save_folder}/Comparison_psnr_diff_percentile.png')
+        if show:plt.show()
+        plt.close()
 
+        return None
 
-
-
-
-
-
-
+Inference = Inference(ckpt_path_list = ['../lightning_logs/08-04_19-23-58/checkpoints/epoch=199-step=39999.ckpt'],save_folder = '../inference_results/')
+Inference.run_inference()

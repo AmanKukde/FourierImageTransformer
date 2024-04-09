@@ -103,7 +103,7 @@ class MNIST_SResFITDM(SResFITDataModule):
 
 class CelebA_SResFITDM(SResFITDataModule):
 
-    def __init__(self, root_dir, batch_size):
+    def __init__(self, root_dir, batch_size, subset_flag = False):
         """
         Uses the CelebA[1] dataset.
 
@@ -115,6 +115,8 @@ class CelebA_SResFITDM(SResFITDataModule):
             Deep learning face attributes in the wild.
             In Proceedings of International Conference on Computer Vision (ICCV), December 2015.
         """
+        self.subset_flag = subset_flag
+        self.batch_size = batch_size
         super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=63)
 
     def prepare_data(self, *args, **kwargs):

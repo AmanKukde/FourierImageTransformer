@@ -1,21 +1,20 @@
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning.loggers import WandbLogger
+from fit.datamodules.super_res.SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM
+from fit.modules.SResTransformerModule import SResTransformerModule
+from fit.utils.tomo_utils import get_polar_rfft_coords_2D
+from pathlib import Path
+import datetime
+import ssl
+import wandb
+import torch
 import sys
 sys.path.append("./")
 
-import torch
-import wandb
-import ssl
-import datetime
-
-from fit.utils.tomo_utils import get_polar_rfft_coords_2D
-from fit.modules.SResTransformerModule import SResTransformerModule
-from fit.datamodules.super_res.SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM
-
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.callbacks import ModelCheckpoint
 
 ssl._create_default_https_context = ssl._create_unverified_context
-torch.set_float32_matmul_precision("medium")
+# torch.set_float32_matmul_precision("medium")
 seed_everything(22122020)
 
 if __name__ == "__main__":
@@ -23,89 +22,98 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
-    parser.add_argument("--dataset", type=str, help="Dataset to be used", default="MNIST")
+    parser.add_argument("--dataset", type=str,
+                        help="Dataset to be used", default="CelebA")
     parser.add_argument("--loss", type=str, help="loss", default="prod")
-    parser.add_argument("--lr", type=float, help="Learning rate", default=0.0001)
-    parser.add_argument("--model_type", type=str, help="Model to be used in the transformer (torch or fast or mamba)", default="mamba")
-    parser.add_argument("--n_layers", type=int, help="Number of layers in the transformer", default=8)
-    parser.add_argument("--n_heads", type=int, help="No of heads in the transformer", default=8)
-    parser.add_argument("--n_shells",type=int,help="Number of shells used as lowres-input in the transformer",default=5)
-    parser.add_argument("--subset_flag", action="store_true", help="Use subset of the dataset")
-    parser.add_argument("--wandb", action="store_true", help="Use wandb for logging", default=True)
+    parser.add_argument("--lr", type=float,
+                        help="Learning rate", default=0.0001)
+    parser.add_argument("--model_type", type=str,
+                        help="Model to be used in the transformer (torch or fast or mamba)", default="torch")
+    parser.add_argument("--n_layers", type=int,
+                        help="Number of layers in the transformer", default=8)
+    parser.add_argument("--n_heads", type=int,
+                        help="No of heads in the transformer", default=8)
+    parser.add_argument("--n_shells", type=int,
+                        help="Number of shells used as lowres-input in the transformer", default=5)
+    parser.add_argument("--subset_flag", action="store_true",
+                        help="Use subset of the dataset")
+    parser.add_argument("--wandb", action="store_true",
+                        help="Use wandb for logging", default=False)
     parser.add_argument("--note", type=str, help="note", default="")
-    parser.add_argument("--w_phi", type=float, help="Weight for phi loss", default=1)
-    parser.add_argument("--models_save_path", type=str, default="/home/aman.kukde/Projects/FourierImageTransformer/models/")
-    parser.add_argument("--resume_training_from_checkpoint", type=str, default=None)
-
+    parser.add_argument("--w_phi", type=float,
+                        help="Weight for phi loss", default=1)
+    parser.add_argument("--models_save_path", type=str,
+                        default="/home/aman.kukde/Projects/FourierImageTransformer/models")
+    parser.add_argument("--resume_training_from_checkpoint",
+                        type=str, default=None)
+    parser.add_argument("--batch_size", type=int, default=8)
 
     args = parser.parse_args()
-    n_layers = args.n_layers
-    lr = args.lr
-    n_shells = args.n_shells
-    n_heads = args.n_heads
-    dataset = args.dataset
-    loss = args.loss
-    d_query = args.d_query
-    note = args.note
-    wandb_flag = args.wandb
-    model_type = args.model_type
-    subset_flag = args.subset_flag
-    models_save_path = args.models_save_path
-    w_phi = args.w_phi
-    resume_training_from_checkpoint = args.resume_training_from_checkpoint
 
-    dm = MNIST_SResFITDM(root_dir="./datamodules/data/", batch_size=32,subset_flag = subset_flag)
+    if args.dataset == "MNIST":
+        dm = MNIST_SResFITDM(root_dir="./datamodules/data/",
+                             batch_size=args.batch_size, subset_flag=args.subset_flag)
+    if args.dataset == "CelebA":
+        dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
+                              batch_size=args.batch_size, subset_flag=args.subset_flag)
+
     dm.prepare_data()
     dm.setup()
 
-    r, phi, flatten_order, order = get_polar_rfft_coords_2D(img_shape=dm.gt_shape)
+    r, phi, flatten_order, order = get_polar_rfft_coords_2D(
+        img_shape=dm.gt_shape)
 
     model = SResTransformerModule(
-        n_heads=n_heads,
-        d_query=d_query,
+        n_heads=args.n_heads,
+        d_query=args.d_query,
         img_shape=dm.gt_shape,
         coords=(r, phi),
-        model_type=model_type,
+        model_type=args.model_type,
         dst_flatten_order=flatten_order,
         dst_order=order,
-        loss=loss,
-        lr=lr,
+        loss=args.loss,
+        lr=args.lr,
         weight_decay=0.01,
-        n_layers=n_layers,
-        num_shells=n_shells,
-        w_phi=w_phi
+        n_layers=args.n_layers,
+        num_shells=args.n_shells,
+        w_phi=args.w_phi
     )
     print(f"\n\n\n\n{model}\n\n\n\n")
-    name = str.capitalize(model_type) + f"_{loss}_{note}_L_{n_layers}_H_{n_heads}_s_{n_shells}_subset_{subset_flag}_" + datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
-    if wandb_flag:
+    models_save_path = f"{args.models_save_path}/{args.dataset}/{args.model_type}/{args.loss}"
+    Path(models_save_path).mkdir(parents=True, exist_ok=True)
+    if args.w_phi != 1:
+        note = args.note + f"_wp_{int(args.w_phi)}"
+    name = str.capitalize(args.model_type) + f"_{args.dataset}_{args.loss}_{note}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_" + \
+        datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
+
+    if args.wandb:
         wandb_logger = WandbLogger(
             name=f"{name}",
-            project="Fourier Image Transformer",
+            project="Mamba_FIT",
             save_dir=f"{models_save_path}/{name}",
             log_model="best",
             settings=wandb.Settings(code_dir="."),
         )
-    else: 
+    else:
         wandb_logger = None
 
     trainer = Trainer(
-        max_epochs=1000,
-        
+        max_epochs=100000,
+
         logger=wandb_logger,
         enable_checkpointing=True,
         default_root_dir=f"{models_save_path}/{name}",
         callbacks=ModelCheckpoint(
-            resume_from_checkpoint=resume_training_from_checkpoint,
             dirpath=f"{models_save_path}/{name}",
             save_top_k=1,
             verbose=False,
-            save_last=True, 
+            save_last=True,
             monitor="Validation/avg_val_phi_loss",
             mode="min",
         ),
     )
 
-    trainer.fit(model, datamodule=dm)
+    trainer.fit(model, datamodule=dm,ckpt_path=args.resume_training_from_checkpoint)
     trainer.validate(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
