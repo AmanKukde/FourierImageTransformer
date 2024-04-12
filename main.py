@@ -23,12 +23,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--dataset", type=str,
-                        help="Dataset to be used", default="CelebA")
-    parser.add_argument("--loss", type=str, help="loss", default="prod")
+                        help="Dataset to be used", default="MNIST")
+    parser.add_argument("--loss", type=str, help="loss", default="L2")
     parser.add_argument("--lr", type=float,
                         help="Learning rate", default=0.0001)
     parser.add_argument("--model_type", type=str,
-                        help="Model to be used in the transformer (torch or fast or mamba)", default="torch")
+                        help="Model to be used in the transformer (torch or fast or mamba)", default="fast")
     parser.add_argument("--n_layers", type=int,
                         help="Number of layers in the transformer", default=8)
     parser.add_argument("--n_heads", type=int,
@@ -83,8 +83,8 @@ if __name__ == "__main__":
     models_save_path = f"{args.models_save_path}/{args.dataset}/{args.model_type}/{args.loss}"
     Path(models_save_path).mkdir(parents=True, exist_ok=True)
     if args.w_phi != 1:
-        note = args.note + f"_wp_{int(args.w_phi)}"
-    name = str.capitalize(args.model_type) + f"_{args.dataset}_{args.loss}_{note}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_" + \
+        args.note += f"_wp_{int(args.w_phi)}"
+    name = str.capitalize(args.model_type) + f"_{args.dataset}_{args.loss}_{args.note}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_" + \
         datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
     if args.wandb:

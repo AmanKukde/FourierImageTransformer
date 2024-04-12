@@ -73,7 +73,9 @@ class SResTransformer(torch.nn.Module):
             y_hat = self.encoder(x, attn_mask=mask)
 
         y_amp = self.predictor_amp(y_hat)
-        y_phase = torch.tanh(self.predictor_phase(y_hat))
+        # y_phase = self.custom_activation_func(self.predictor_phase(y_hat))
+        y_phase = self.predictor_phase(y_hat)
+        # y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
     def forward_inference(self, x,max_seq_length=378): #(32,39,256)
@@ -86,4 +88,6 @@ class SResTransformer(torch.nn.Module):
         assert x_hat.shape[1] == max_seq_length
         assert (x_hat[:,:x.shape[1]] == x).all()
         return x_hat
-   
+    
+    def custom_activation_func(self,x,k = 0.5):
+        return 1/(1+torch.exp(k*(-x)))
