@@ -52,7 +52,9 @@ class SResTransformer(torch.nn.Module):
         self.encoder.to('cuda')
         
         self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)
+        # self.predictor_amp = torch.nn.Linear(int(n_heads * d_query*0.5),1)
         self.predictor_phase = torch.nn.Linear(n_heads * d_query,1)
+        # self.predictor_phase = torch.nn.Linear(int(n_heads * d_query*0.5),1)
 
     def forward(self, x):
         x = self.fourier_coefficient_embedding(x) #shape = 377,2 --> 377,128
@@ -74,8 +76,8 @@ class SResTransformer(torch.nn.Module):
 
         y_amp = self.predictor_amp(y_hat)
         # y_phase = self.custom_activation_func(self.predictor_phase(y_hat))
-        y_phase = self.predictor_phase(y_hat)
-        # y_phase = torch.tanh(self.predictor_phase(y_hat))
+        # y_phase = self.predictor_phase(y_hat)
+        y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
     def forward_inference(self, x,max_seq_length=378): #(32,39,256)

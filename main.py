@@ -1,7 +1,7 @@
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import WandbLogger
-from fit.datamodules.super_res.SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM
+from fit.datamodules.super_res import MNIST_SResFITDM, CelebA_SResFITDM,BioSRMicrotubules
 from fit.modules.SResTransformerModule import SResTransformerModule
 from fit.utils.tomo_utils import get_polar_rfft_coords_2D
 from pathlib import Path
@@ -23,8 +23,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--dataset", type=str,
-                        help="Dataset to be used", default="MNIST")
-    parser.add_argument("--loss", type=str, help="loss", default="L2")
+                        help="Dataset to be used", default="BioSr")
+    parser.add_argument("--loss", type=str, help="loss", default="prod")
     parser.add_argument("--lr", type=float,
                         help="Learning rate", default=0.0001)
     parser.add_argument("--model_type", type=str,
@@ -46,7 +46,7 @@ if __name__ == "__main__":
                         default="/home/aman.kukde/Projects/FourierImageTransformer/models")
     parser.add_argument("--resume_training_from_checkpoint",
                         type=str, default=None)
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=2)
 
     args = parser.parse_args()
 
@@ -56,7 +56,9 @@ if __name__ == "__main__":
     if args.dataset == "CelebA":
         dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
                               batch_size=args.batch_size, subset_flag=args.subset_flag)
-
+    if args.dataset == "BioSr":
+        dm = BioSRMicrotubules(root_dir="./datamodules/data/",batch_size = 8)
+    
     dm.prepare_data()
     dm.setup()
 
@@ -82,9 +84,10 @@ if __name__ == "__main__":
 
     models_save_path = f"{args.models_save_path}/{args.dataset}/{args.model_type}/{args.loss}"
     Path(models_save_path).mkdir(parents=True, exist_ok=True)
+    w = "wp_1"
     if args.w_phi != 1:
-        args.note += f"_wp_{int(args.w_phi)}"
-    name = str.capitalize(args.model_type) + f"_{args.dataset}_{args.loss}_{args.note}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_" + \
+        w = f"wp_{int(args.w_phi)}"
+    name = str.capitalize(args.model_type) + f"_{args.dataset}_{w}_{args.loss}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_{args.note}" + \
         datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
     if args.wandb:
@@ -115,5 +118,5 @@ if __name__ == "__main__":
     )
 
     trainer.fit(model, datamodule=dm,ckpt_path=args.resume_training_from_checkpoint)
-    trainer.validate(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    # trainer.validate(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)

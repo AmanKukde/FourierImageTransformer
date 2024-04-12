@@ -7,10 +7,12 @@ import wget
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
+from torchvision.transforms.functional import resize
 
 from fit.datamodules.super_res import SResFourierCoefficientDataset
 from fit.datamodules.GroundTruthDatasetFactory import GroundTruthDatasetFactory
 from fit.utils.utils import normalize
+from fit.utils import read_mrc
 
 
 class SResFITDataModule(LightningDataModule):
@@ -76,7 +78,7 @@ class MNIST_SResFITDM(SResFITDataModule):
         mnist_test = MNIST(self.root_dir, train=False, download=True).data.type(torch.float32)
         mnist_train_val = MNIST(self.root_dir, train=True, download=True).data.type(torch.float32)
         np.random.seed(1612)
-        
+
         if self.subset_flag:
             print("Using subset of MNIST dataset")
             mnist_train = mnist_train_val[114, 1:, 1:]
@@ -90,7 +92,7 @@ class MNIST_SResFITDM(SResFITDataModule):
             mnist_train = mnist_train_val[perm[:55000], 1:, 1:]
             mnist_val = mnist_train_val[perm[55000:], 1:, 1:]
             mnist_test = mnist_test[:, 1:, 1:]
-            
+
         self.mean = mnist_train.mean()
         self.std = mnist_train.std()
 
@@ -137,3 +139,26 @@ class CelebA_SResFITDM(SResFITDataModule):
         gt_test = normalize(gt_test, self.mean, self.std)
         self.gt_ds = GroundTruthDatasetFactory(gt_train, gt_val, gt_test)
 
+
+class BioSRMicrotubules(SResFITDataModule):
+    def __init__(self, root_dir, batch_size, subset_flag=False):
+        self.subset_flag = subset_flag
+        self.batch_size = batch_size
+        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=129)
+
+    def prepare_data(self, *args, **kwargs):
+        images = read_mrc.read_mrc('/group/jug/ashesh/data/BioSR/Microtubules/GT_all.mrc')[1]
+        images = torch.permute(torch.from_numpy(images).type(torch.float32),(2,0,1))
+        images = resize(images, (129, 129))
+        np.random.seed(1612)
+        gt_train = images[:45]
+        gt_val = images[45:50]
+        gt_test = images[50:]
+        
+        self.mean = images.mean()
+        self.std = images.std()
+        del images
+        gt_train = normalize(gt_train, self.mean, self.std)
+        gt_val = normalize(gt_val, self.mean, self.std)
+        gt_test = normalize(gt_test, self.mean, self.std)
+        self.gt_ds = GroundTruthDatasetFactory(gt_train, gt_val, gt_test)
