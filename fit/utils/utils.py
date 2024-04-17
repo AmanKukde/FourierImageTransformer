@@ -227,7 +227,8 @@ def normalize(data, mean, std):
     :param std:
     :return: normalized data
     """
-    return (data - mean) / std
+    return data/255.
+    # return (data - mean) / std
 
 
 def denormalize(data, mean, std):
