@@ -29,10 +29,10 @@ class SResTransformer(torch.nn.Module):
 
         if self.model_type == 'mamba':
             conf = MambaConfig()
-            conf.num_hidden_layers = 8
+            conf.num_hidden_layers = n_layers
             conf.expand = 4
-            conf.hidden_size = 256
-            conf.intermediate_size = 512
+            conf.hidden_size = d_model
+            conf.intermediate_size = d_model*4
             self.encoder = MambaModel(conf)
 
         if self.model_type == 'torch':

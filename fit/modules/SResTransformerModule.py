@@ -3,7 +3,7 @@ import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from fit.modules.loss import _fc_prod_loss, _fc_sum_loss, _fc_L2_loss_sum_mean,_fc_L2_loss_prod,_fc_L2_loss_sum_abs
+from fit.modules.loss import _fc_prod_loss, _fc_sum_loss, _fc_L2_loss_sum_mean,_fc_L2_loss_prod,_fc_L2_loss_sum_abs,_fc_sum_loss_w_dist,_fc_prod_loss_w_dist,_fc_sum_loss_log_weighted
 from fit.transformers_fit.SResTransformer import SResTransformer
 from fit.utils.utils import convert2DFT
 from fit.utils.PSNR import RangeInvariantPsnr as PSNR
@@ -67,8 +67,14 @@ class SResTransformerModule(LightningModule):
             self.loss = _fc_L2_loss_sum_abs
         elif loss == 'L2_prod':
             self.loss = _fc_L2_loss_prod
+        elif loss == 'sum_w_dist':
+            self.loss = _fc_sum_loss_w_dist
+        elif loss == 'prod_w_dist':
+            self.loss = _fc_prod_loss_w_dist
+        elif loss == 'sum_log_weighted':
+            self.loss = _fc_sum_loss_log_weighted
         else:
-            raise ValueError(f"Loss type {loss} not supported; supported types are 'prod', 'sum', 'L2_sum_mean', 'L2_sum_abs', 'L2_prod'")
+            raise ValueError(f"Loss type {loss} not supported; supported types are 'prod', 'sum', 'L2_sum_mean', 'L2_sum_abs', 'L2_prod', 'sum_w_dist', 'prod_w_dist', 'sum_log_weighted'")
 
         self.train_outputs_list = []  #for storing outputs of training step
         self.val_outputs_list = []  #for storing outputs of validation epoch
@@ -110,16 +116,16 @@ class SResTransformerModule(LightningModule):
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
-            'monitor': 'Validation/avg_val_phi_loss'
+            'monitor': 'Train/train_mean_epoch_phi_loss'
         }
 
     def criterion(self, pred_fc, target_fc, mag_min, mag_max):
-        fc_loss, amp_loss, phi_loss= self.loss(pred_fc=pred_fc,
+        fc_loss, amp_loss, phi_loss,weighted_phi_loss= self.loss(pred_fc=pred_fc,
                                                 target_fc=target_fc,
                                                 amp_min=mag_min,
                                                 amp_max=mag_max,
                                                 w_phi=self.w_phi)
-        return fc_loss, amp_loss, phi_loss
+        return fc_loss, amp_loss, phi_loss,weighted_phi_loss
 
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch  #378,2
@@ -128,12 +134,13 @@ class SResTransformerModule(LightningModule):
 
         pred = self.sres.forward(x_fc)
 
-        fc_loss, amp_loss, phi_loss= self.criterion(pred, y_fc, mag_min,
+        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(pred, y_fc, mag_min,
                                                      mag_max)
         output_dict = {
             'loss': fc_loss,
             'amp_loss': amp_loss,
             'phi_loss': phi_loss,
+            'weighted_phi_loss': weighted_phi_loss
         }
         self.log_dict(output_dict, prog_bar=True, on_step=True)
         self.train_outputs_list.append(output_dict)
@@ -146,6 +153,8 @@ class SResTransformerModule(LightningModule):
             torch.tensor([x['amp_loss'] for x in self.train_outputs_list]))
         phi_loss = torch.mean(
             torch.tensor([x['phi_loss'] for x in self.train_outputs_list]))
+        weighted_phi_loss = torch.mean(
+            torch.tensor([x['weighted_phi_loss'] for x in self.train_outputs_list]))
         self.log('Train/train_mean_epoch_loss',
                  loss,
                  logger=True,
@@ -158,7 +167,12 @@ class SResTransformerModule(LightningModule):
                  phi_loss,
                  logger=True,
                  on_epoch=True)
-        self.log('Learning_Rate', self.hparams.lr, logger=True, on_epoch=True)
+        self.log('Train/train_mean_epoch_weighted_phi_loss',
+                 weighted_phi_loss,
+                 logger=True,
+                 on_epoch=True)
+        
+
         self.train_outputs_list = []
 
     def log_val_images(self, fc, mag_min, mag_max):
@@ -190,7 +204,7 @@ class SResTransformerModule(LightningModule):
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
         pred = self.sres.forward(x_fc)
 
-        val_loss, amp_loss, phi_loss= self.criterion(pred, y_fc, mag_min,
+        val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(pred, y_fc, mag_min,
                                                       mag_max)
 
         if self.current_epoch % 25 == 0 and batch_idx == 0 and self.logger._name != 'lightning_logs':
@@ -199,7 +213,9 @@ class SResTransformerModule(LightningModule):
         output = {
             'val_loss': val_loss,
             'val_amp_loss': amp_loss,
-            'val_phi_loss': phi_loss
+            'val_phi_loss': phi_loss,
+            'val_weighted_phi_loss': weighted_phi_loss
+
         }
         self.log_dict(output)
         self.val_outputs_list.append(output)
