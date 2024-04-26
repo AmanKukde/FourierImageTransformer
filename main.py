@@ -24,11 +24,11 @@ if __name__ == "__main__":
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--dataset", type=str,
                         help="Dataset to be used", default="MNIST")
-    parser.add_argument("--loss", type=str, help="loss", default="sum_log_weighted")
+    parser.add_argument("--loss", type=str, help="loss", default="sum")
     parser.add_argument("--lr", type=float,
                         help="Learning rate", default=0.0001)
     parser.add_argument("--model_type", type=str,
-                        help="Model to be used in the transformer (torch or fast or mamba)", default="fast")
+                        help="Model to be used in the transformer (torch or fast or mamba)", default="mamba")
     parser.add_argument("--n_layers", type=int,
                         help="Number of layers in the transformer", default=8)
     parser.add_argument("--n_heads", type=int,
@@ -111,6 +111,11 @@ if __name__ == "__main__":
         num_sanity_val_steps=0,
         max_epochs=100000,
         logger=wandb_logger,
+        gpus=1,
+        devices = 1,
+        precision=16,
+        # num_nodes = 2,
+        # strategy="ddp",
         enable_checkpointing=True,
         default_root_dir=f"{models_save_path}/{name}",
         callbacks=[ModelCheckpoint(

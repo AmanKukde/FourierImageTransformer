@@ -1,4 +1,5 @@
 from pyexpat import model
+from sklearn.model_selection import PredefinedSplit
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -202,13 +203,16 @@ class SResTransformerModule(LightningModule):
         fc, (mag_min, mag_max) = batch
         x_fc = fc[:, self.dst_flatten_order][:, :-1]
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
-        pred = self.sres.forward(x_fc)
 
+        pred_gt = fc[:, self.dst_flatten_order].clone()
+        pred = self.sres.forward(x_fc)
+        pred_gt[:,1:] = pred 
+        
         val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(pred, y_fc, mag_min,
                                                       mag_max)
 
         if self.current_epoch % 25 == 0 and batch_idx == 0 and self.logger._name != 'lightning_logs':
-            self.save_forward_func_output(pred, mag_min, mag_max)
+            self.save_forward_func_output(pred_gt, mag_min, mag_max)
             self.log_val_images(fc, mag_min, mag_max)
         output = {
             'val_loss': val_loss,
@@ -226,7 +230,7 @@ class SResTransformerModule(LightningModule):
         self.logger.experiment.log({
             f"Validation_Images/val_fwd_fnc_output": [
                 wandb.Image(pred_img[0].cpu(),
-                            caption=f"pred_of_forward_menthod")
+                            caption=f"pred_of_forward_method")
             ],
             "global_step":
             self.trainer.global_step
