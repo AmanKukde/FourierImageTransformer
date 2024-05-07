@@ -35,7 +35,8 @@ class SResTransformerModule(LightningModule):
                  dropout=0.1,
                  w_phi=1,
                  reduceLR_patience=20,
-                 reduceLR_factor=0.5):
+                 reduceLR_factor=0.5,
+                 job_id=''):
         super().__init__()
 
         self.model_type = model_type
@@ -55,7 +56,7 @@ class SResTransformerModule(LightningModule):
                                   "weight_decay", "w_phi", "n_layers",
                                   "n_heads", "d_query", "reduceLR_patience",
                                   "reduceLR_factor", "num_shells",
-                                  "attention_dropout", "dropout")
+                                  "attention_dropout", "dropout", "job_id")
 
         # Set the loss function based on the input loss type
         if loss == 'prod':
@@ -110,13 +111,13 @@ class SResTransformerModule(LightningModule):
                           weight_decay=self.hparams.weight_decay)
         scheduler = ReduceLROnPlateau(optimizer,
                                       mode='min',
-                                      factor=0.5,
+                                      factor=0.1,
                                       verbose=True,
                                       patience=20,
-                                      min_lr=1e-6)
+                                      min_lr=1e-4)
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'Train/train_mean_epoch_phi_loss'
         }
 
@@ -308,7 +309,7 @@ class SResTransformerModule(LightningModule):
                           dst_flatten_order=self.dst_flatten_order,
                           img_shape=self.hparams.img_shape)
         return torch.fft.irfftn(dft,
-                                s=2 * (self.hparams.img_shape, ),
+                                s=2 * (self.hparams.img_shape,),
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):

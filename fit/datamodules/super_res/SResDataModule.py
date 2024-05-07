@@ -44,17 +44,17 @@ class SResFITDataModule(LightningDataModule):
                                           amp_max=self.mag_max),
             batch_size=self.batch_size, num_workers=0)
 
-    # def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-    #     return DataLoader(
-    #         SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-    #                                       amp_max=self.mag_max),
-    #         batch_size=self.batch_size, num_workers=0)
+    def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max),
+            batch_size=self.batch_size, num_workers=0)
 
-    # def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
-    #     return DataLoader(
-    #         SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
-    #                                       amp_max=self.mag_max),
-    #         batch_size=self.batch_size)
+    def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
+        return DataLoader(
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
+                                          amp_max=self.mag_max),
+            batch_size=self.batch_size)
 
 
 class MNIST_SResFITDM(SResFITDataModule):
@@ -221,16 +221,24 @@ class BioSRMicrotubules(SResFITDataModule):
     def __init__(self, root_dir, batch_size, subset_flag=False):
         self.subset_flag = subset_flag
         self.batch_size = batch_size
-        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=129)
+        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=99)
 
     def prepare_data(self, *args, **kwargs):
         images = read_mrc.read_mrc('/group/jug/ashesh/data/BioSR/Microtubules/GT_all.mrc')[1]
-        images = torch.permute(torch.from_numpy(images).type(torch.float32),(2,0,1))
-        images = resize(images, (129, 129))
+        from patchify import patchify
+        data = np.array([patchify(i, (100,100), step=100) for i in images.T])
+        data = data.reshape(-1,100,100)
+        for i in range(len(data)):
+            if data[i].mean() < 2500:
+                data[i] = 0
+
+        images = torch.from_numpy(data[:,1:,1:]).type(torch.float32)
+        print(images.shape)
         np.random.seed(1612)
-        gt_train = images[:45]
-        gt_val = images[45:50]
-        gt_test = images[50:]
+        l = len(images)
+        gt_train = images[:81*l//100]
+        gt_val = images[81*l//100:9*l//10]
+        gt_test = images[9*l//10:]
         
         self.mean = images.mean()
         self.std = images.std()
@@ -244,7 +252,7 @@ class BioSRFActin(SResFITDataModule):
     def __init__(self, root_dir, batch_size, subset_flag=False):
         self.subset_flag = subset_flag
         self.batch_size = batch_size
-        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=129)
+        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=1003)
 
     def prepare_data(self, *args, **kwargs):
         images = read_mrc.read_mrc('/group/jug/ashesh/data/BioSR/F-actin_Nonlinear/GT_all_b.mrc')[1]

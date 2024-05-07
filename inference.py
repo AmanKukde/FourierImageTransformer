@@ -1,4 +1,6 @@
 import sys
+
+from sklearn import model_selection
 sys.path.append('../')
 from fit.datamodules.super_res import MNIST_SResFITDM, CelebA_SResFITDM
 from fit.utils.tomo_utils import get_polar_rfft_coords_2D
@@ -28,9 +30,9 @@ class Inference:
 
     def run_inference(self):
         for path in self.ckpt_path_list:
-            model_type, model, loss, dataset, dm, flatten_order = self._load_model_from_ckpt_path(
+            model_type, model, loss, dataset, dm, flatten_order,model_created = self._load_model_from_ckpt_path(
                 ckpt_path=path)
-            save_loc = self.save_folder + f"/{model_type}_{dataset}/{loss}/{datetime.datetime.now().strftime('%m_%d_%H_%M')}"
+            save_loc = self.save_folder + f"/{model_type}_{dataset}/{loss}/{model_created}/{datetime.datetime.now().strftime('%m_%d_%H_%M')}"
             Path(save_loc).mkdir(parents=True, exist_ok=True)
                 
             self.test_model_save_pred_psnr(
@@ -41,10 +43,12 @@ class Inference:
                 save_location=save_loc)
 
     def _load_model_from_ckpt_path(self, ckpt_path):
+        #/home/aman.kukde/Projects/FourierImageTransformer/models/CelebA/fast/sum/Fast_CelebA_wp_1000_sum_L_8_H_8_s_10_subset_False_Contd._08_04-18_18_18_29-04_18-32-39/epoch=1461-step=2130000.ckpt
         ckpt_path = ckpt_path
         dataset = ckpt_path.split('/')[-5]
         model_type = ckpt_path.split('/')[-4]
         loss = ckpt_path.split('/')[-3]
+        model_created = (ckpt_path.split('/')[-2]).split('_')[-1]
         seed_everything(22122020)
 
         if dataset == "MNIST":
@@ -79,7 +83,7 @@ class Inference:
         model.cuda()
         model.eval()
         print('Model Loaded')
-        return model_type, model, loss, dataset, dm, flatten_order
+        return model_type, model, loss, dataset, dm, flatten_order,model_created
 
     def test_model_save_pred_psnr(self, model_type, model, dm, flatten_order,
                                   save_location):
@@ -260,5 +264,14 @@ class Inference:
 
         return None
 
-Inference = Inference(ckpt_path_list = ['/home/aman.kukde/Projects/FourierImageTransformer/models/CelebA/mamba/sum/Mamba_CelebA_sum__wp_100_L_8_H_8_s_5_subset_False_08-04_17-47-40/epoch=678-step=848750.ckpt'],save_folder = './inference_results/')
-Inference.run_inference()
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ckpt_path", type=str, help="Path to the checkpoint", default="")
+    parser.add_argument("--save_folder", type=str, help="Folder to save the results", default="./inference_results/")
+    args = parser.parse_args()
+    Inference = Inference(ckpt_path_list = [args.ckpt_path],save_folder = args.save_folder)
+    Inference.run_inference()
+

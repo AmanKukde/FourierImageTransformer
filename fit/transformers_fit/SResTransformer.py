@@ -27,6 +27,14 @@ class SResTransformer(torch.nn.Module):
         ) 
         self.model_type = model_type
 
+        # if self.model_type == 'mamba':
+        #     conf = MambaConfig()
+        #     conf.num_hidden_layers = 24
+        #     conf.expand = 4
+        #     conf.hidden_size = 2
+        #     conf.intermediate_size =128
+        #     self.encoder = MambaModel(conf)
+
         if self.model_type == 'mamba':
             conf = MambaConfig()
             conf.num_hidden_layers = n_layers
@@ -52,9 +60,9 @@ class SResTransformer(torch.nn.Module):
         self.encoder.to('cuda')
         
         self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)
-        # self.predictor_amp = torch.nn.Linear(int(n_heads * d_query*0.5),1)
+    
         self.predictor_phase = torch.nn.Linear(n_heads * d_query,1)
-        # self.predictor_phase = torch.nn.Linear(int(n_heads * d_query*0.5),1)
+      
 
     def forward(self, x):
         x = self.fourier_coefficient_embedding(x) #shape = 377,2 --> 377,128
@@ -63,7 +71,6 @@ class SResTransformer(torch.nn.Module):
         if self.model_type == 'mamba':
             y_hat = self.encoder(inputs_embeds = x)
             y_hat = y_hat.last_hidden_state
-        
         if self.model_type == 'torch':
             triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
             mask = triangular_mask.additive_matrix_finite
@@ -75,8 +82,6 @@ class SResTransformer(torch.nn.Module):
             y_hat = self.encoder(x, attn_mask=mask)
 
         y_amp = self.predictor_amp(y_hat)
-        # y_phase = self.custom_activation_func(self.predictor_phase(y_hat))
-        # y_phase = self.predictor_phase(y_hat)
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
