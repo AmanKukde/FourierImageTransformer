@@ -1,4 +1,5 @@
 from pyexpat import model
+from sklearn.model_selection import PredefinedSplit
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -34,7 +35,8 @@ class SResTransformerModule(LightningModule):
                  dropout=0.1,
                  w_phi=1,
                  reduceLR_patience=20,
-                 reduceLR_factor=0.5):
+                 reduceLR_factor=0.5,
+                 job_id=''):
         super().__init__()
 
         self.model_type = model_type
@@ -54,7 +56,7 @@ class SResTransformerModule(LightningModule):
                                   "weight_decay", "w_phi", "n_layers",
                                   "n_heads", "d_query", "reduceLR_patience",
                                   "reduceLR_factor", "num_shells",
-                                  "attention_dropout", "dropout")
+                                  "attention_dropout", "dropout", "job_id")
 
         # Set the loss function based on the input loss type
         if loss == 'prod':
@@ -109,13 +111,13 @@ class SResTransformerModule(LightningModule):
                           weight_decay=self.hparams.weight_decay)
         scheduler = ReduceLROnPlateau(optimizer,
                                       mode='min',
-                                      factor=0.5,
+                                      factor=0.1,
                                       verbose=True,
                                       patience=20,
-                                      min_lr=1e-6)
+                                      min_lr=1e-4)
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'Train/train_mean_epoch_phi_loss'
         }
 
@@ -202,13 +204,16 @@ class SResTransformerModule(LightningModule):
         fc, (mag_min, mag_max) = batch
         x_fc = fc[:, self.dst_flatten_order][:, :-1]
         y_fc = fc[:, self.dst_flatten_order][:, 1:]
-        pred = self.sres.forward(x_fc)
 
+        pred_gt = fc[:, self.dst_flatten_order].clone()
+        pred = self.sres.forward(x_fc)
+        pred_gt[:,1:] = pred 
+        
         val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(pred, y_fc, mag_min,
                                                       mag_max)
 
         if self.current_epoch % 25 == 0 and batch_idx == 0 and self.logger._name != 'lightning_logs':
-            self.save_forward_func_output(pred, mag_min, mag_max)
+            self.save_forward_func_output(pred_gt, mag_min, mag_max)
             self.log_val_images(fc, mag_min, mag_max)
         output = {
             'val_loss': val_loss,
@@ -226,7 +231,7 @@ class SResTransformerModule(LightningModule):
         self.logger.experiment.log({
             f"Validation_Images/val_fwd_fnc_output": [
                 wandb.Image(pred_img[0].cpu(),
-                            caption=f"pred_of_forward_menthod")
+                            caption=f"pred_of_forward_method")
             ],
             "global_step":
             self.trainer.global_step
@@ -304,7 +309,7 @@ class SResTransformerModule(LightningModule):
                           dst_flatten_order=self.dst_flatten_order,
                           img_shape=self.hparams.img_shape)
         return torch.fft.irfftn(dft,
-                                s=2 * (self.hparams.img_shape, ),
+                                s=2 * (self.hparams.img_shape,),
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
