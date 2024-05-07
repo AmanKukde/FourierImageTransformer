@@ -22,9 +22,12 @@ class SResFourierCoefficientDataset(Dataset):
             log_amps = log_amplitudes(tmp_ffts.abs())
             self.amp_min = log_amps.min()
             self.amp_max = log_amps.max()
+       
         else:
             self.amp_min = amp_min
+           
             self.amp_max = amp_max
+
 
     def __getitem__(self, item):
         img = self.ds[item]

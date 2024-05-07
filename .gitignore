@@ -160,3 +160,6 @@ lightning_logs
 *.json
 *.DS_Store
 .DS_Store
+
+Playground.ipynb
+.gitingore
