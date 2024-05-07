@@ -154,12 +154,11 @@ lightning_logs
 # model ipynb_checkpoints
 *.ckpt
 *.png
-*.ipynb
+# *.ipynb
 *.gitkeep
 *.gitignore
 *.json
 *.DS_Store
 .DS_Store
 
-Playground.ipynb
 .gitingore
