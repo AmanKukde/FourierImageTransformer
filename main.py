@@ -1,4 +1,3 @@
-from charset_normalizer import detect
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.strategies import DDPStrategy
@@ -24,6 +23,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--job_id", type=str, help="Job Id of Slurm Job", default="")
+    parser.add_argument("--num_nodes", type=int, help="Number of nodes", default=1)
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--dataset", type=str,
                         help="Dataset to be used", default="MNIST")
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         logger=wandb_logger,
         devices = -1,
         precision='16-mixed',
-        num_nodes = 3,
+        num_nodes = args.num_nodes,
         strategy=DDPStrategy(find_unused_parameters=True),
         enable_checkpointing=True,
         gradient_clip_val=0.3,

@@ -160,19 +160,19 @@ class SResTransformerModule(LightningModule):
         self.log('Train/train_mean_epoch_loss',
                  loss,
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         self.log('Train/train_mean_epoch_amp_loss',
                  amp_loss,
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         self.log('Train/train_mean_epoch_phi_loss',
                  phi_loss,
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         self.log('Train/train_mean_epoch_weighted_phi_loss',
                  weighted_phi_loss,
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         
 
         self.train_outputs_list = []
@@ -248,15 +248,15 @@ class SResTransformerModule(LightningModule):
         self.log('Validation/avg_val_loss',
                  torch.mean(val_loss),
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         self.log('Validation/avg_val_amp_loss',
                  torch.mean(val_amp_loss),
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
         self.log('Validation/avg_val_phi_loss',
                  torch.mean(val_phi_loss),
                  logger=True,
-                 on_epoch=True)
+                 on_epoch=True,sync_dist=True)
 
     def on_test_epoch_end(self):
         lowres_psnrs = torch.stack(self.test_outputs[0])
@@ -264,18 +264,22 @@ class SResTransformerModule(LightningModule):
         self.log('Test/Input Mean PSNR',
                  torch.mean(lowres_psnrs),
                  logger=True,
+                 sync_dist = True,
                  on_epoch=True)
         self.log('Test/Input SEM PSNR',
                  torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),
                  logger=True,
+                 sync_dist = True,
                  on_epoch=True)
         self.log('Test/Prediction Mean PSNR',
                  torch.mean(pred_psnrs),
                  logger=True,
+                 sync_dist = True,
                  on_epoch=True)
         self.log('Test/Prediction SEM PSNR',
                  torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),
                  logger=True,
+                 sync_dist = True,
                  on_epoch=True)
 
     def test_step(self, batch, batch_idx):
@@ -294,14 +298,17 @@ class SResTransformerModule(LightningModule):
         pred_psnrs = self.test_outputs[1]
         torch.save(lowres_psnrs, f'{self.trainer.default_root_dir}/{self.model_type}_lowres.pt')
         torch.save(pred_psnrs, f'{self.trainer.default_root_dir}/{self.model_type}_pred.pt')
-        self.log('Input Mean PSNR', torch.mean(lowres_psnrs), logger=True)
+        self.log('Input Mean PSNR', torch.mean(lowres_psnrs), logger=True,sync_dist = True,)
         self.log('Input SEM PSNR',
                  torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),
+                 sync_dist = True,
                  logger=True)
-        self.log('Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True)
+        self.log('Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True,sync_dist = True,)
         self.log('Prediction SEM PSNR',
                  torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),
+                 sync_dist = True,
                  logger=True)
+        
     def convert2img(self, fc, mag_min, mag_max):
         dft = convert2DFT(x=fc,
                           amp_min=mag_min,
@@ -324,7 +331,7 @@ class SResTransformerModule(LightningModule):
             pred, mag_min=mag_min, mag_max=mag_max
         )  #no need for [dst_flatten_order] as x_fc was made that way
         lowres = torch.zeros_like(pred)
-        lowres += fc.min()
+        lowres += fc.mean()
         lowres[:, :self.
                input_seq_length] = fc[:,
                                       self.dst_flatten_order][:, :self.
