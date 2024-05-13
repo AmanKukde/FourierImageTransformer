@@ -252,16 +252,17 @@ class BioSRFActin(SResFITDataModule):
     def __init__(self, root_dir, batch_size, subset_flag=False):
         self.subset_flag = subset_flag
         self.batch_size = batch_size
-        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=1003)
+        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=1505)
 
     def prepare_data(self, *args, **kwargs):
         images = read_mrc.read_mrc('/group/jug/ashesh/data/BioSR/F-actin_Nonlinear/GT_all_b.mrc')[1]
         images = torch.permute(torch.from_numpy(images).type(torch.float32),(2,0,1))
-        images = resize(images, (129, 129))
+        # images = resize(images, (129, 129))
+        l = len(images)
         np.random.seed(1612)
-        gt_train = images[:45]
-        gt_val = images[45:50]
-        gt_test = images[50:]
+        gt_train = images[:81*l//100,1:,1:]
+        gt_val = images[81*l//100:9*l//10,1:,1:]
+        gt_test = images[9*l//10:,1:,1:]
         
         self.mean = images.mean()
         self.std = images.std()

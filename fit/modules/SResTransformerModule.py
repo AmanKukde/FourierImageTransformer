@@ -10,6 +10,8 @@ from fit.utils.utils import convert2DFT
 from fit.utils.PSNR import RangeInvariantPsnr as PSNR
 from fit.utils.RAdam import RAdam
 import wandb
+import math
+from torch.nn.functional import interpolate
 import numpy as np
 import torch.fft
 from fit.utils.utils import denormalize
@@ -130,21 +132,45 @@ class SResTransformerModule(LightningModule):
         return fc_loss, amp_loss, phi_loss,weighted_phi_loss
 
     def training_step(self, batch, batch_idx):
-        fc, (mag_min, mag_max) = batch  #378,2
-        x_fc = fc[:, self.dst_flatten_order][:, :-1]
-        y_fc = fc[:, self.dst_flatten_order][:, 1:]
+        fc, (mag_min, mag_max) = batch  #batch,tokens,2
+        x, y = np.meshgrid(range(self.dft_shape[1]), range(-self.dft_shape[0] // 2 + 1, self.dft_shape[0] // 2 + 1))
+        radii = np.round(np.sqrt(x ** 2 + y ** 2, dtype=np.float32))
+        tokens_per_radius = []
+        R = self.dft_shape[0] // 2 + 1 #Radius
+        E = int((self.dft_shape[0] // 2 + 1)*np.pi) #Extrapolation size
+        L = math.floor((self.dft_shape[0] // 2 + 1) * 1.414) #Maximum radius
+        Intrapolated = torch.zeros(size = (fc.shape[0],2,L,E)) #Collect the extrpolated tokens. (Batch, 2, Radius, Extrapolation)
+        fc = fc.permute(0,2,1).to('cuda')
+        for r in range(0,L):
+            selected_ring = (radii == r)
+            tokens_per_radius.append(radii[selected_ring].shape[-1])
+            selected_ring = selected_ring.flatten()
+            input_ =  fc[:,:,selected_ring]
+            Intrapolated[:,:,r,:] = interpolate(input_, E)
+        Intrapolated = Intrapolated.permute(0,2,3,1)
+        CF = int(Intrapolated.shape[2]*0.2)
+        Conv_Layer = torch.nn.Conv3d(L,L,(CF,1,1), stride=(CF,1,1))
+        x = Conv_Layer(Intrapolated.unsqueeze(-1)).view(fc.shape[0],-1,2).to('cuda') #Batch, Sectors as Tokens, 2
 
-        pred = self.sres.forward(x_fc)
+        y_enc_out = self.sres.forward(x.to('cuda'))
+        DeConv_input = torch.cat((x[:,0].unsqueeze(1),y_enc_out[:,:-1]),dim=1)
+        DeConv_Layer = torch.nn.ConvTranspose3d(L,L,(CF,1,1), stride=(CF,1,1)).to('cuda')
+        DeConv_output = DeConv_Layer(DeConv_input.view(fc.shape[0],L,-1,2).unsqueeze(-1)).squeeze(-1)
+        DeConv_output = DeConv_output.permute(0,-1,1,2)
 
-        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(pred, y_fc, mag_min,
-                                                     mag_max)
+        pred = []
+        for n,i in enumerate(tokens_per_radius):
+            pred.append(interpolate(DeConv_output[:,:,n],i))
+        pred = torch.cat([*pred], dim=-1).permute(0,2,1)
+        fc = fc.permute(0,2,1)
+        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(pred, fc, mag_min,mag_max)
         output_dict = {
             'loss': fc_loss,
             'amp_loss': amp_loss,
             'phi_loss': phi_loss,
             'weighted_phi_loss': weighted_phi_loss
         }
-        self.log_dict(output_dict, prog_bar=True, on_step=True)
+        self.log_dict(output_dict, prog_bar=True, on_step=True,sync_dist=True)
         self.train_outputs_list.append(output_dict)
         return output_dict
 
@@ -222,7 +248,7 @@ class SResTransformerModule(LightningModule):
             'val_weighted_phi_loss': weighted_phi_loss
 
         }
-        self.log_dict(output)
+        self.log_dict(output,on_step= True, sync_dist=True)
         self.val_outputs_list.append(output)
         return output
 

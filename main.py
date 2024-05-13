@@ -64,8 +64,9 @@ if __name__ == "__main__":
         dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
                               batch_size=args.batch_size, subset_flag=args.subset_flag)
     if args.dataset == "BioSr":
-        dm = BioSRMicrotubules(root_dir="./datamodules/data/",batch_size = 8)
-    if args.dataset == "omniglot":
+        dm = BioSRMicrotubules(root_dir="./datamodules/data/",
+                               batch_size=args.batch_size, subset_flag=args.subset_flag)
+    if args.dataset == "Omniglot":
         dm = Omniglot(root_dir="./datamodules/data/",
                                 batch_size=args.batch_size, subset_flag=args.subset_flag)
     
@@ -121,7 +122,7 @@ if __name__ == "__main__":
         max_epochs=100000,
         logger=wandb_logger,
         devices = -1,
-        precision='16-mixed',
+        # precision='16-mixed',
         num_nodes = args.num_nodes,
         strategy=DDPStrategy(find_unused_parameters=True),
         enable_checkpointing=True,
@@ -141,5 +142,6 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.model_weights)["state_dict"],strict=True)
 
     trainer.fit(model, datamodule=dm,ckpt_path=args.resume_training_from_checkpoint)
-    # trainer.validate(model, datamodule=dm)
+    trainer.validate_loop._results.clear()
+    trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)

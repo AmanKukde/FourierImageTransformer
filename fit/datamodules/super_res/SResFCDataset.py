@@ -35,6 +35,7 @@ class SResFourierCoefficientDataset(Dataset):
         img_amp, img_phi = normalize_FC(img_fft, amp_min=self.amp_min, amp_max=self.amp_max)
 
         img_fft = torch.stack([img_amp.flatten(), img_phi.flatten()], dim=-1)
+        # img_fft = torch.stack([img_amp, img_phi], dim=0)
         return img_fft, (self.amp_min.unsqueeze(-1), self.amp_max.unsqueeze(-1))
 
     def __len__(self):
