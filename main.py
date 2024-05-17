@@ -142,6 +142,6 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(args.model_weights)["state_dict"],strict=True)
 
     trainer.fit(model, datamodule=dm,ckpt_path=args.resume_training_from_checkpoint)
-    trainer.validate_loop._results.clear()
-    trainer.validate(model, datamodule=dm)
+    # trainer.validate_loop._results.clear()
+    # trainer.validate(model, datamodule=dm)
     # trainer.test(model, datamodule=dm)

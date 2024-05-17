@@ -15,6 +15,7 @@ from torch.nn.functional import interpolate
 import numpy as np
 import torch.fft
 from fit.utils.utils import denormalize
+from torch.nn.functional import avg_pool3d
 
 
 
@@ -113,13 +114,13 @@ class SResTransformerModule(LightningModule):
                           weight_decay=self.hparams.weight_decay)
         scheduler = ReduceLROnPlateau(optimizer,
                                       mode='min',
-                                      factor=0.1,
+                                      factor=0.5,
                                       verbose=True,
                                       patience=20,
-                                      min_lr=1e-4)
+                                      min_lr=1e-5)
         return {
             'optimizer': optimizer,
-            # 'lr_scheduler': scheduler,
+            'lr_scheduler': scheduler,
             'monitor': 'Train/train_mean_epoch_phi_loss'
         }
 
@@ -149,20 +150,31 @@ class SResTransformerModule(LightningModule):
             Intrapolated[:,:,r,:] = interpolate(input_, E)
         Intrapolated = Intrapolated.permute(0,2,3,1)
         CF = int(Intrapolated.shape[2]*0.2)
-        Conv_Layer = torch.nn.Conv3d(L,L,(CF,1,1), stride=(CF,1,1))
-        x = Conv_Layer(Intrapolated.unsqueeze(-1)).view(fc.shape[0],-1,2).to('cuda') #Batch, Sectors as Tokens, 2
 
-        y_enc_out = self.sres.forward(x.to('cuda'))
-        DeConv_input = torch.cat((x[:,0].unsqueeze(1),y_enc_out[:,:-1]),dim=1)
+        #Convolutional Layer
+        # Conv_Layer = torch.nn.Conv3d(L,L,(CF,1,1), stride=(CF,1,1))
+        # x = Conv_Layer(Intrapolated.unsqueeze(-1)).view(fc.shape[0],-1,2).to('cuda') #Batch, Sectors as Tokens, 2
+
+        #AvgPoolLayer 
+        x = avg_pool3d(Intrapolated,(1,CF,1),(1,CF,1)).to('cuda').view(fc.shape[0],-1,2)
+
+        y_enc_out = self.sres.forward(x[:,:-1])
+        Y_1 = torch.cat((x[:,0].unsqueeze(1),y_enc_out),dim=1)
+
         DeConv_Layer = torch.nn.ConvTranspose3d(L,L,(CF,1,1), stride=(CF,1,1)).to('cuda')
-        DeConv_output = DeConv_Layer(DeConv_input.view(fc.shape[0],L,-1,2).unsqueeze(-1)).squeeze(-1)
+
+        DeConv_output = DeConv_Layer(Y_1.view(fc.shape[0],L,-1,2).unsqueeze(-1)).squeeze(-1)
         DeConv_output = DeConv_output.permute(0,-1,1,2)
+        # DeConv_output[:,1] = torch.tanh(DeConv_output[:,1])
+        DeConv_output[:,1] = torch.clip(2 * torch.tanh(DeConv_output[:,1]),min=-1.0,max=1.0)
 
         pred = []
         for n,i in enumerate(tokens_per_radius):
             pred.append(interpolate(DeConv_output[:,:,n],i))
         pred = torch.cat([*pred], dim=-1).permute(0,2,1)
         fc = fc.permute(0,2,1)
+        
+        pred[:,:,0] = fc[:,:,0]
         fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(pred, fc, mag_min,mag_max)
         output_dict = {
             'loss': fc_loss,
@@ -170,7 +182,7 @@ class SResTransformerModule(LightningModule):
             'phi_loss': phi_loss,
             'weighted_phi_loss': weighted_phi_loss
         }
-        self.log_dict(output_dict, prog_bar=True, on_step=True,sync_dist=True)
+        self.log_dict(output_dict, prog_bar=True, on_step=True)
         self.train_outputs_list.append(output_dict)
         return output_dict
 
@@ -186,19 +198,19 @@ class SResTransformerModule(LightningModule):
         self.log('Train/train_mean_epoch_loss',
                  loss,
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         self.log('Train/train_mean_epoch_amp_loss',
                  amp_loss,
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         self.log('Train/train_mean_epoch_phi_loss',
                  phi_loss,
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         self.log('Train/train_mean_epoch_weighted_phi_loss',
                  weighted_phi_loss,
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         
 
         self.train_outputs_list = []
@@ -274,15 +286,15 @@ class SResTransformerModule(LightningModule):
         self.log('Validation/avg_val_loss',
                  torch.mean(val_loss),
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         self.log('Validation/avg_val_amp_loss',
                  torch.mean(val_amp_loss),
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
         self.log('Validation/avg_val_phi_loss',
                  torch.mean(val_phi_loss),
                  logger=True,
-                 on_epoch=True,sync_dist=True)
+                 on_epoch=True)
 
     def on_test_epoch_end(self):
         lowres_psnrs = torch.stack(self.test_outputs[0])
@@ -290,22 +302,22 @@ class SResTransformerModule(LightningModule):
         self.log('Test/Input Mean PSNR',
                  torch.mean(lowres_psnrs),
                  logger=True,
-                 sync_dist = True,
+                
                  on_epoch=True)
         self.log('Test/Input SEM PSNR',
                  torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),
                  logger=True,
-                 sync_dist = True,
+                
                  on_epoch=True)
         self.log('Test/Prediction Mean PSNR',
                  torch.mean(pred_psnrs),
                  logger=True,
-                 sync_dist = True,
+                
                  on_epoch=True)
         self.log('Test/Prediction SEM PSNR',
                  torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),
                  logger=True,
-                 sync_dist = True,
+                
                  on_epoch=True)
 
     def test_step(self, batch, batch_idx):
@@ -324,15 +336,15 @@ class SResTransformerModule(LightningModule):
         pred_psnrs = self.test_outputs[1]
         torch.save(lowres_psnrs, f'{self.trainer.default_root_dir}/{self.model_type}_lowres.pt')
         torch.save(pred_psnrs, f'{self.trainer.default_root_dir}/{self.model_type}_pred.pt')
-        self.log('Input Mean PSNR', torch.mean(lowres_psnrs), logger=True,sync_dist = True,)
+        self.log('Input Mean PSNR', torch.mean(lowres_psnrs), logger=True)
         self.log('Input SEM PSNR',
                  torch.std(lowres_psnrs / np.sqrt(len(lowres_psnrs))),
-                 sync_dist = True,
+                
                  logger=True)
-        self.log('Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True,sync_dist = True,)
+        self.log('Prediction Mean PSNR', torch.mean(pred_psnrs), logger=True)
         self.log('Prediction SEM PSNR',
                  torch.std(pred_psnrs / np.sqrt(len(pred_psnrs))),
-                 sync_dist = True,
+                
                  logger=True)
         
     def convert2img(self, fc, mag_min, mag_max):

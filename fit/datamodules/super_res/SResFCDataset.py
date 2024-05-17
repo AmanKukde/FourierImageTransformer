@@ -21,7 +21,9 @@ class SResFourierCoefficientDataset(Dataset):
             tmp_ffts = torch.fft.rfftn(tmp_imgs, dim=[1, 2])
             log_amps = log_amplitudes(tmp_ffts.abs())
             self.amp_min = log_amps.min()
+            # self.amp_min = torch.tensor([0])
             self.amp_max = log_amps.max()
+            # self.amp_max = torch.tensor([0])
        
         else:
             self.amp_min = amp_min
@@ -34,9 +36,9 @@ class SResFourierCoefficientDataset(Dataset):
         img_fft = torch.fft.rfftn(img, dim=[0, 1])
         img_amp, img_phi = normalize_FC(img_fft, amp_min=self.amp_min, amp_max=self.amp_max)
 
-        img_fft = torch.stack([img_amp.flatten(), img_phi.flatten()], dim=-1)
+        img_fft_flattened = torch.stack([img_amp.flatten(), img_phi.flatten()], dim=-1)
         # img_fft = torch.stack([img_amp, img_phi], dim=0)
-        return img_fft, (self.amp_min.unsqueeze(-1), self.amp_max.unsqueeze(-1))
+        return img_fft_flattened, (self.amp_min.unsqueeze(-1), self.amp_max.unsqueeze(-1))
 
     def __len__(self):
         return len(self.ds)
