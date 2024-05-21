@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--subset_flag", action="store_true",
                         help="Use subset of the dataset")
     parser.add_argument("--wandb", action="store_true",
-                        help="Use wandb for logging", default=False)
+                        help="Use wandb for logging", default= False)
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--w_phi", type=float,
                         help="Weight for phi loss", default=1000)
@@ -70,11 +70,13 @@ if __name__ == "__main__":
         dm = Omniglot(root_dir="./datamodules/data/",
                                 batch_size=args.batch_size, subset_flag=args.subset_flag)
     
+    
+
     dm.prepare_data()
     dm.setup()
 
-    r, phi, flatten_order, order = get_polar_rfft_coords_2D(
-        img_shape=dm.gt_shape)
+    r, phi, flatten_order, order, fc_per_ring = get_polar_rfft_coords_2D(
+    img_shape=dm.gt_shape)
 
     model = SResTransformerModule(
         n_heads=args.n_heads,
@@ -90,7 +92,8 @@ if __name__ == "__main__":
         n_layers=args.n_layers,
         num_shells=args.n_shells,
         w_phi=args.w_phi,
-        job_id = args.job_id
+        job_id = args.job_id,
+        fc_per_ring = fc_per_ring
     )
     print(f"\n\n\n\n{model}\n\n\n\n")
 

@@ -39,6 +39,7 @@ class SResTransformerModule(LightningModule):
                  w_phi=1,
                  reduceLR_patience=20,
                  reduceLR_factor=0.5,
+                 fc_per_ring = {},
                  job_id=''):
         super().__init__()
 
@@ -54,6 +55,7 @@ class SResTransformerModule(LightningModule):
         self.n_layers = n_layers
         self.loss = loss
         self.w_phi = w_phi
+        self.fc_per_ring = fc_per_ring  
 
         self.save_hyperparameters("model_type", "img_shape", "loss", "lr",
                                   "weight_decay", "w_phi", "n_layers",
@@ -133,49 +135,16 @@ class SResTransformerModule(LightningModule):
         return fc_loss, amp_loss, phi_loss,weighted_phi_loss
 
     def training_step(self, batch, batch_idx):
-        fc, (mag_min, mag_max) = batch  #batch,tokens,2
-        x, y = np.meshgrid(range(self.dft_shape[1]), range(-self.dft_shape[0] // 2 + 1, self.dft_shape[0] // 2 + 1))
-        radii = np.round(np.sqrt(x ** 2 + y ** 2, dtype=np.float32))
-        tokens_per_radius = []
-        R = self.dft_shape[0] // 2 + 1 #Radius
-        E = int((self.dft_shape[0] // 2 + 1)*np.pi) #Extrapolation size
-        L = math.floor((self.dft_shape[0] // 2 + 1) * 1.414) #Maximum radius
-        Intrapolated = torch.zeros(size = (fc.shape[0],2,L,E)) #Collect the extrpolated tokens. (Batch, 2, Radius, Extrapolation)
-        fc = fc.permute(0,2,1).to('cuda')
-        for r in range(0,L):
-            selected_ring = (radii == r)
-            tokens_per_radius.append(radii[selected_ring].shape[-1])
-            selected_ring = selected_ring.flatten()
-            input_ =  fc[:,:,selected_ring]
-            Intrapolated[:,:,r,:] = interpolate(input_, E)
-        Intrapolated = Intrapolated.permute(0,2,3,1)
-        CF = int(Intrapolated.shape[2]*0.2)
-
-        #Convolutional Layer
-        # Conv_Layer = torch.nn.Conv3d(L,L,(CF,1,1), stride=(CF,1,1))
-        # x = Conv_Layer(Intrapolated.unsqueeze(-1)).view(fc.shape[0],-1,2).to('cuda') #Batch, Sectors as Tokens, 2
-
-        #AvgPoolLayer 
-        x = avg_pool3d(Intrapolated,(1,CF,1),(1,CF,1)).to('cuda').view(fc.shape[0],-1,2)
-
-        y_enc_out = self.sres.forward(x[:,:-1])
-        Y_1 = torch.cat((x[:,0].unsqueeze(1),y_enc_out),dim=1)
-
-        DeConv_Layer = torch.nn.ConvTranspose3d(L,L,(CF,1,1), stride=(CF,1,1)).to('cuda')
-
-        DeConv_output = DeConv_Layer(Y_1.view(fc.shape[0],L,-1,2).unsqueeze(-1)).squeeze(-1)
-        DeConv_output = DeConv_output.permute(0,-1,1,2)
-        # DeConv_output[:,1] = torch.tanh(DeConv_output[:,1])
-        DeConv_output[:,1] = torch.clip(2 * torch.tanh(DeConv_output[:,1]),min=-1.0,max=1.0)
-
-        pred = []
-        for n,i in enumerate(tokens_per_radius):
-            pred.append(interpolate(DeConv_output[:,:,n],i))
-        pred = torch.cat([*pred], dim=-1).permute(0,2,1)
-        fc = fc.permute(0,2,1)
+        fc, (mag_min, mag_max) = batch  #batch,tokens,2 #64,(27*14 = 378),2
         
-        pred[:,:,0] = fc[:,:,0]
-        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(pred, fc, mag_min,mag_max)
+        x,input_  = self.embed_sectors(fc)
+
+        output = self.sres.forward(x) #batch,tokens,2
+
+        y = self.de_embed_sectors(output,input_,x)
+
+        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y, fc, mag_min,mag_max)
+        
         output_dict = {
             'loss': fc_loss,
             'amp_loss': amp_loss,
@@ -185,6 +154,32 @@ class SResTransformerModule(LightningModule):
         self.log_dict(output_dict, prog_bar=True, on_step=True)
         self.train_outputs_list.append(output_dict)
         return output_dict
+
+    def embed_sectors(self, fc):
+        x = fc[:, self.dst_flatten_order].clone().permute(0,2,1) #batch,2,tokens
+        interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) *10 #interpolation size should be multiple of 10 for easy calculation #14*3.14 = 44-->50
+        input_ = torch.zeros(size=(fc.shape[0],2,interpolation_size,len(self.fc_per_ring.keys()))).to('cuda')
+
+        for r in self.fc_per_ring.keys():
+            selected_ring = x[:,:,:self.fc_per_ring[r]]
+            x = x[:,:,self.fc_per_ring[r]:]  
+            input_[...,int(r)] = interpolate(selected_ring,interpolation_size)
+
+        circle = input_[...,:self.dft_shape[1]].permute(0,3,2,1)  #batch,ring,2,interpolation_size
+        x = circle.reshape(fc.shape[0],-1,2*interpolation_size//10)[:,:-1]
+        return x, input_
+
+    def de_embed_sectors(self, pred,input_,x):
+        y = torch.cat([x[:,:1,:],pred],dim = 1)
+        
+        y = y.reshape_as(input_[...,:self.dft_shape[1]]) #batch,2, ring,interpolation_size
+        y = torch.cat([y, input_[...,self.dft_shape[1]:]],dim = -1) #batch,2,interpolation_size,ring
+
+        output = []
+        for r in self.fc_per_ring.keys():
+            output.append(interpolate(y[:,:,r,:],self.fc_per_ring[r]))
+        output = torch.cat(output,dim = -1).permute(0,2,1) #batch,378,2    
+        return output
 
     def on_train_epoch_end(self):
         loss = torch.mean(

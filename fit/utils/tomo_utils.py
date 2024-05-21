@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-
+from collections import Counter
 from fit.utils import cart2pol, pol2cart
 
 
@@ -52,10 +52,10 @@ def get_polar_rfft_coords_2D(img_shape):
     :return: x, y, flatten_indices, rings
     """
     assert img_shape % 2 == 1, '`img_shape` has to be odd.'
-    x, y, flatten_indices, order = get_cartesian_rfft_coords_2D(img_shape)
+    x, y, flatten_indices, order, fc_per_ring = get_cartesian_rfft_coords_2D(img_shape)
     y -= img_shape // 2
     r, phi = cart2pol(x, y)
-    return r, phi, flatten_indices, order
+    return r, phi, flatten_indices, order,fc_per_ring
 
 
 def get_cartesian_rfft_coords_sinogram(angles, det_len):
@@ -95,4 +95,4 @@ def get_cartesian_rfft_coords_2D(img_shape):
     ycoords = ycoords.flatten()[flatten_order]
 
     return torch.from_numpy(xcoords), torch.from_numpy(ycoords), torch.from_numpy(flatten_order), torch.from_numpy(
-        rings)
+        rings), dict(Counter(np.round(rings.flatten(),0).astype(int)[flatten_order]))

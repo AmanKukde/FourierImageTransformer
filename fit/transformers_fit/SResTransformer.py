@@ -4,6 +4,10 @@ from fit.transformers_fit.PositionalEncoding2D import PositionalEncoding2D
 from fast_transformers.masking import TriangularCausalMask
 from fast_transformers.builders import TransformerEncoderBuilder
 from transformers import MambaConfig,MambaModel
+import numpy as np
+from torch.nn.functional import avg_pool3d, interpolate
+import math
+
    
 class SResTransformer(torch.nn.Module):
     def __init__(self,
@@ -18,7 +22,7 @@ class SResTransformer(torch.nn.Module):
                  attention_dropout=0.1):
         super(SResTransformer, self).__init__()
         self.model_type = model_type
-        self.fourier_coefficient_embedding = torch.nn.Linear(2, d_model // 2) #shape = (2,N/2)
+        self.fourier_coefficient_embedding = torch.nn.Linear(10, d_model // 2) #shape = (2,N/2)
         self.pos_embedding = PositionalEncoding2D(
             d_model // 2, #F/2
             coords=coords, #(r,phi)
@@ -59,12 +63,13 @@ class SResTransformer(torch.nn.Module):
 
         self.encoder.to('cuda')
         
-        self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)
+        self.predictor_amp = torch.nn.Linear(n_heads * d_query,5)
     
-        self.predictor_phase = torch.nn.Linear(n_heads * d_query,1)
-      
+        self.predictor_phase = torch.nn.Linear(n_heads * d_query,5)
+    
 
     def forward(self, x):
+
         x = self.fourier_coefficient_embedding(x) #shape = 377,2 --> 377,128
         x = self.pos_embedding(x) #shape 377,128 --> 377,256
         
@@ -82,11 +87,11 @@ class SResTransformer(torch.nn.Module):
             y_hat = self.encoder(x, attn_mask=mask)
 
         y_amp = self.predictor_amp(y_hat)
-        # y_phase = torch.tanh(self.predictor_phase(y_hat))
-        y_phase = self.predictor_phase(y_hat)
-        return torch.cat([y_amp, y_phase], dim=-1)
+        y_phase = torch.tanh(self.predictor_phase(y_hat))
+
+        return torch.stack([y_amp, y_phase], dim=-1).reshape(x.shape[0], x.shape[1], -1) #shape 377,5,2 --> 377,5,2 --> 377,10
     
-    def forward_inference(self, x,max_seq_length=378): #(32,39,256)
+    def my_model_inference(self, x,max_seq_length=378): #(32,39,256)
         with torch.no_grad():
             x_hat = x.clone()
             for i in range(x.shape[1],max_seq_length):
@@ -97,5 +102,3 @@ class SResTransformer(torch.nn.Module):
         assert (x_hat[:,:x.shape[1]] == x).all()
         return x_hat
     
-    def custom_activation_func(self,x,k = 0.5):
-        return 1/(1+torch.exp(k*(-x)))
