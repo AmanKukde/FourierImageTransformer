@@ -147,11 +147,8 @@ class SResTransformer(torch.nn.Module):
     
     def get_de_interpolated_rings(self,output):
         final_output = []
-        total_length = 0
         for r in self.fc_per_ring.keys():
             final_output.append(interpolate(output[:,:,r,:],self.fc_per_ring[r], mode ="nearest-exact"))
-            total_length += self.fc_per_ring[r]
-            print(len(final_output),final_output[-1].shape, total_length)
         final_output = torch.cat(final_output,dim = -1).permute(0,2,1) #batch,378,2  
         return final_output
     
