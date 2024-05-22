@@ -140,7 +140,7 @@ class SResTransformer(torch.nn.Module):
 
     def get_full_plane_from_sectors(self,output,interpolated_fc):
          #batch,ring,2,interpolation_size
-        output = output.reshape(32,14,2,50) #batch,2, ring,self.interpolation_size
+        output = output.reshape(interpolated_fc.shape[0],-1,2,self.interpolation_size) #batch,2, ring,self.interpolation_size
         output = output.permute(0,2,1,3)
         output = torch.cat([output, interpolated_fc[...,self.dft_shape[1]:,:]],dim = -2) #batch,2,interpolation_size,ring
         return output
