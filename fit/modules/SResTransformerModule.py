@@ -88,7 +88,7 @@ class SResTransformerModule(LightningModule):
         self.val_outputs_list = []  #for storing outputs of validation epoch
 
 
-        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) *10 
+        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) * 10 
         # Initialize the SResTransformer Model
         self.sres = SResTransformer(
             d_model=self.hparams.n_heads * self.hparams.d_query,
@@ -147,6 +147,7 @@ class SResTransformerModule(LightningModule):
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch  #batch,tokens,2 #64,(27*14 = 378),2
         fc = fc[:, self.dst_flatten_order]
+        
         y_hat = self.sres.forward(fc)
 
         fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y_hat, fc, mag_min,mag_max)

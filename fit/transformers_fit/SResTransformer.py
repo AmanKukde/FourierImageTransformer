@@ -113,7 +113,8 @@ class SResTransformer(torch.nn.Module):
             return interpolated_fc
 
     def get_largest_semicircle(self,interpolated_fc):
-        largest_semicircle = interpolated_fc[...,:self.dft_shape[1]]  #batch,ring,2,interpolation_size
+        largest_semicircle = interpolated_fc[...,:self.dft_shape[1],:]
+        largest_semicircle = largest_semicircle.permute(0,2,1,-1)  #batch,ring,2,interpolation_size
         largest_semicircle = largest_semicircle.reshape(interpolated_fc.shape[0],-1,2*(self.interpolation_size//10))
         return largest_semicircle
         
@@ -123,25 +124,25 @@ class SResTransformer(torch.nn.Module):
 
         interpolated_fc = self.get_interpolated_rings(fc)
 
-        # largest_semicircle = self.get_largest_semicircle(interpolated_fc)
+        largest_semicircle = self.get_largest_semicircle(interpolated_fc)
 
-        # pred = self.model_forward(largest_semicircle[:,:-1,:]) #batch,tokens,2
+        pred = self.model_forward(largest_semicircle[:,:-1,:]) #batch,tokens,2
         
-        # output = torch.cat([largest_semicircle[:,:1,:],pred],dim = 1)
+        output = torch.cat([largest_semicircle[:,:1,:],pred],dim = 1)
         
-        # output = self.get_full_plane_from_sectors(largest_semicircle,interpolated_fc)
+        output = self.get_full_plane_from_sectors(output,interpolated_fc)
         
-        # final_output = self.get_de_interpolated_rings(output)
-        final_output = self.get_de_interpolated_rings(interpolated_fc)
-        
-        # final_output = self.FCC(y_hat)
+        final_output = self.get_de_interpolated_rings(output)
+
 
         return final_output
     
 
     def get_full_plane_from_sectors(self,output,interpolated_fc):
-        output = output.reshape_as(interpolated_fc[...,:self.dft_shape[1]]) #batch,2, ring,self.interpolation_size
-        output = torch.cat([output, interpolated_fc[...,self.dft_shape[1]:]],dim = -1) #batch,2,interpolation_size,ring
+         #batch,ring,2,interpolation_size
+        output = output.reshape(32,14,2,50) #batch,2, ring,self.interpolation_size
+        output = output.permute(0,2,1,3)
+        output = torch.cat([output, interpolated_fc[...,self.dft_shape[1]:,:]],dim = -2) #batch,2,interpolation_size,ring
         return output
     
     def get_de_interpolated_rings(self,output):
