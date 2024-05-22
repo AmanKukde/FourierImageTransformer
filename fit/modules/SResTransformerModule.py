@@ -1,4 +1,5 @@
 from pyexpat import model
+from requests import get
 from sklearn.model_selection import PredefinedSplit
 import torch
 from pytorch_lightning import LightningModule
@@ -86,6 +87,8 @@ class SResTransformerModule(LightningModule):
         self.train_outputs_list = []  #for storing outputs of training step
         self.val_outputs_list = []  #for storing outputs of validation epoch
 
+
+        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) *10 
         # Initialize the SResTransformer Model
         self.sres = SResTransformer(
             d_model=self.hparams.n_heads * self.hparams.d_query,
@@ -97,7 +100,10 @@ class SResTransformerModule(LightningModule):
             n_heads=self.hparams.n_heads,
             d_query=self.hparams.d_query,
             dropout=self.hparams.dropout,
-            attention_dropout=self.hparams.attention_dropout)
+            fc_per_ring=self.fc_per_ring,
+            dft_shape=self.dft_shape,
+            attention_dropout=self.hparams.attention_dropout,
+            interpolation_size = self.interpolation_size)
 
         x, y = np.meshgrid(
             range(self.dft_shape[1]),
@@ -106,6 +112,7 @@ class SResTransformerModule(LightningModule):
                         self.dft_shape[0] // 2 + 1, 0)
         num_shells = self.shells
         self.input_seq_length = np.sum(np.round(radii) < num_shells)
+        
 
     def forward(self, x):
         return self.sres.forward(x)
@@ -134,16 +141,15 @@ class SResTransformerModule(LightningModule):
                                                 w_phi=self.w_phi)
         return fc_loss, amp_loss, phi_loss,weighted_phi_loss
 
+
+    
+
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch  #batch,tokens,2 #64,(27*14 = 378),2
-        
-        x,input_  = self.embed_sectors(fc)
+        fc = fc[:, self.dst_flatten_order]
+        y_hat = self.sres.forward(fc)
 
-        output = self.sres.forward(x) #batch,tokens,2
-
-        y = self.de_embed_sectors(output,input_,x)
-
-        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y, fc, mag_min,mag_max)
+        fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y_hat, fc, mag_min,mag_max)
         
         output_dict = {
             'loss': fc_loss,
@@ -154,32 +160,6 @@ class SResTransformerModule(LightningModule):
         self.log_dict(output_dict, prog_bar=True, on_step=True)
         self.train_outputs_list.append(output_dict)
         return output_dict
-
-    def embed_sectors(self, fc):
-        x = fc[:, self.dst_flatten_order].clone().permute(0,2,1) #batch,2,tokens
-        interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) *10 #interpolation size should be multiple of 10 for easy calculation #14*3.14 = 44-->50
-        input_ = torch.zeros(size=(fc.shape[0],2,interpolation_size,len(self.fc_per_ring.keys()))).to('cuda')
-
-        for r in self.fc_per_ring.keys():
-            selected_ring = x[:,:,:self.fc_per_ring[r]]
-            x = x[:,:,self.fc_per_ring[r]:]  
-            input_[...,int(r)] = interpolate(selected_ring,interpolation_size)
-
-        circle = input_[...,:self.dft_shape[1]].permute(0,3,2,1)  #batch,ring,2,interpolation_size
-        x = circle.reshape(fc.shape[0],-1,2*interpolation_size//10)[:,:-1]
-        return x, input_
-
-    def de_embed_sectors(self, pred,input_,x):
-        y = torch.cat([x[:,:1,:],pred],dim = 1)
-        
-        y = y.reshape_as(input_[...,:self.dft_shape[1]]) #batch,2, ring,interpolation_size
-        y = torch.cat([y, input_[...,self.dft_shape[1]:]],dim = -1) #batch,2,interpolation_size,ring
-
-        output = []
-        for r in self.fc_per_ring.keys():
-            output.append(interpolate(y[:,:,r,:],self.fc_per_ring[r]))
-        output = torch.cat(output,dim = -1).permute(0,2,1) #batch,378,2    
-        return output
 
     def on_train_epoch_end(self):
         loss = torch.mean(
