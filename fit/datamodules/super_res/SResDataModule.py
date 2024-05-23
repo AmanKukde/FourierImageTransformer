@@ -33,15 +33,15 @@ class SResFITDataModule(LightningDataModule):
         self.mag_max = None
 
     def setup(self, stage: Optional[str] = None):
-        tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=None,
-                                                 amp_max=None)
-        self.mag_min = tmp_fcds.amp_min
-        self.mag_max = tmp_fcds.amp_max
+        tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'))#, amp_min=None,
+                                                 #amp_max=None)
+        # self.mag_min = tmp_fcds.amp_min
+        # self.mag_max = tmp_fcds.amp_max
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train')),#, amp_min=self.mag_min,
+                                        #   amp_max=self.mag_max),
             batch_size=self.batch_size, num_workers=0)
 
     # def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
@@ -81,8 +81,7 @@ class MNIST_SResFITDM(SResFITDataModule):
 
         if self.subset_flag:
             print("Using subset of MNIST dataset")
-            mnist_train = mnist_train_val[114, 1:, 1:]
-            mnist_train = torch.tile(mnist_train, (self.batch_size*100, 1, 1))
+            mnist_train = mnist_train_val[:15000, 1:, 1:]
             mnist_val = mnist_train.clone()
         else :
             print("Using Full MNIST dataset")

@@ -29,7 +29,7 @@ class SResTransformer(torch.nn.Module):
         self.dft_shape = dft_shape
         self.interpolation_size = interpolation_size
         self.dst_flatten_order = flatten_order
-        self.fourier_coefficient_embedding = torch.nn.Linear(10, d_model // 2) #shape = (2,N/2)
+        self.fourier_coefficient_embedding = torch.nn.Linear(2*self.interpolation_size//10, d_model // 2) #shape = (2,N/2)
         self.pos_embedding = PositionalEncoding2D(
             d_model // 2, #F/2
             coords=coords, #(r,phi)
@@ -181,8 +181,10 @@ class SResTransformer(torch.nn.Module):
             mask = triangular_mask
             y_hat = self.encoder(x, attn_mask=mask)
 
-        y_amp = self.predictor_amp(y_hat)
-        y_phase = torch.tanh(self.predictor_phase(y_hat))
+        y_amp = 2*torch.tanh(self.predictor_amp(y_hat))
+        y_amp = torch.clip(y_amp,-1.,1.)
+        y_phase = 2*torch.tanh(self.predictor_phase(y_hat))
+        y_phase = torch.clip(y_phase,-1.,1.)
 
         return torch.stack([y_amp, y_phase], dim=-1).reshape(x.shape[0], x.shape[1], -1) #shape 377,5,2 --> 377,5,2 --> 377,10
     
