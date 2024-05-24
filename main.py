@@ -51,7 +51,8 @@ if __name__ == "__main__":
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
     parser.add_argument("--batch_size", type=int, default=32)
-
+    parser.add_argument("--no_of_sectors", type=int, default=10)
+    parser.add_argument("--semi_circle_only_flag", action="store_true", help="Use only semi-circle in the model", default=False)
     args = parser.parse_args()
 
     if args.dataset == "MNIST":
@@ -89,6 +90,8 @@ if __name__ == "__main__":
         loss=args.loss,
         lr=args.lr,
         weight_decay=0.01,
+        semi_circle_only_flag=args.semi_circle_only_flag,
+        no_of_sectors=args.no_of_sectors,
         n_layers=args.n_layers,
         num_shells=args.n_shells,
         w_phi=args.w_phi,
@@ -122,7 +125,7 @@ if __name__ == "__main__":
     lr_monitor = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         num_sanity_val_steps=0,
-        max_epochs=3,
+        max_epochs=10000,
         logger=wandb_logger,
         devices = -1,
         # precision='16-mixed',

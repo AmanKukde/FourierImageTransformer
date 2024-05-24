@@ -38,6 +38,8 @@ class SResTransformerModule(LightningModule):
                  attention_dropout=0.1,
                  dropout=0.1,
                  w_phi=1,
+                 no_of_sectors = 10,
+                 semi_circle_only_flag = False,
                  reduceLR_patience=20,
                  reduceLR_factor=0.5,
                  fc_per_ring = {},
@@ -56,13 +58,15 @@ class SResTransformerModule(LightningModule):
         self.n_layers = n_layers
         self.loss = loss
         self.w_phi = w_phi
-        self.fc_per_ring = fc_per_ring  
+        self.fc_per_ring = fc_per_ring 
+        self.semi_circle_only_flag =semi_circle_only_flag
+        self.no_of_sectors = no_of_sectors 
 
         self.save_hyperparameters("model_type", "img_shape", "loss", "lr",
-                                  "weight_decay", "w_phi", "n_layers",
+                                  "weight_decay", "w_phi", "n_layers","no_of_sectors",
                                   "n_heads", "d_query", "reduceLR_patience",
                                   "reduceLR_factor", "num_shells",
-                                  "attention_dropout", "dropout", "job_id")
+                                  "attention_dropout", "dropout", "job_id","semi_circle_only_flag")
 
         # Set the loss function based on the input loss type
         if loss == 'prod':
@@ -88,7 +92,7 @@ class SResTransformerModule(LightningModule):
         self.val_outputs_list = []  #for storing outputs of validation epoch
 
 
-        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) * 10
+        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) * self.no_of_sectors
 
         x, y = np.meshgrid(
             range(self.dft_shape[1]),
@@ -113,11 +117,10 @@ class SResTransformerModule(LightningModule):
             fc_per_ring=self.fc_per_ring,
             shells=self.shells,
             dft_shape=self.dft_shape,
+            no_of_sectors=self.no_of_sectors,
             attention_dropout=self.hparams.attention_dropout,
+            semi_circle_only_flag = semi_circle_only_flag,
             interpolation_size = self.interpolation_size)
-        
-
-        
         
 
     def forward(self, x):
@@ -154,7 +157,7 @@ class SResTransformerModule(LightningModule):
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch  #batch,tokens,2 #64,(27*14 = 378),2
         fc = fc[:, self.dst_flatten_order]
-        
+        # fc = fc[:, :self.input_seq_length] = 0.
         y_hat = self.sres.forward(fc)
 
         fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y_hat, fc, mag_min,mag_max)

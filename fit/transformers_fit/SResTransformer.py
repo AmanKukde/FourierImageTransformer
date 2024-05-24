@@ -1,6 +1,7 @@
 # This file contains the implementation of the SResTransformer Module in pytorch Lightning
 from os import preadv
 from importlib_metadata import Prepared
+from sympy import preorder_traversal
 import torch
 from fit.transformers_fit.PositionalEncoding2D import PositionalEncoding2D
 from fast_transformers.masking import TriangularCausalMask
@@ -25,6 +26,8 @@ class SResTransformer(torch.nn.Module):
                  shells = 6,
                  dft_shape = None,
                  fc_per_ring=None,
+                 no_of_sectors = 20,
+                 semi_circle_only_flag = False,
                  attention_dropout=0.1):
         super(SResTransformer, self).__init__()
         self.model_type = model_type
@@ -35,7 +38,13 @@ class SResTransformer(torch.nn.Module):
         self.dft_shape = dft_shape
         self.interpolation_size = interpolation_size
         self.dst_flatten_order = flatten_order
-        self.fourier_coefficient_embedding = torch.nn.Linear(2*self.interpolation_size//10, d_model // 2) #shape = (2,N/2)
+        self.d_model = d_model
+        self.no_of_sectors = no_of_sectors
+        self.fourier_coefficient_embedding = torch.nn.Linear(2*self.interpolation_size//self.no_of_sectors, d_model // 2) #shape = (2,N/2)
+        self.semicircle_only_flag = semi_circle_only_flag
+        self.embed_amps = torch.nn.Linear(self.no_of_sectors, d_model // 4) #shape = (5 --> 64)
+        self.embed_phi = torch.nn.Linear(self.no_of_sectors, d_model // 4) #shape = (5 --> 64)
+        
         self.pos_embedding = PositionalEncoding2D(
             d_model // 2, #F/2
             coords=coords, #(r,phi)
@@ -48,18 +57,18 @@ class SResTransformer(torch.nn.Module):
             conf = MambaConfig()
             conf.num_hidden_layers = n_layers
             conf.expand = 4
-            conf.hidden_size = d_query*n_heads
-            conf.intermediate_size = d_query*n_heads*2
+            conf.hidden_size =d_model 
+            conf.intermediate_size =d_model * 2
             self.encoder = MambaModel(conf)
 
         if self.model_type == 'torch':
-            self.encoder = torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(d_model=n_heads * d_query, nhead=n_heads,batch_first=True), num_layers=n_layers)
+            self.encoder = torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(d_model=d_model, nhead=n_heads,batch_first=True), num_layers=n_layers)
         if self.model_type == 'fast' :
             self.encoder = TransformerEncoderBuilder.from_kwargs(
                 attention_type=attention_type,
                 n_layers=n_layers,
                 n_heads=n_heads,
-                feed_forward_dimensions=n_heads * d_query * 4,
+                feed_forward_dimensions=d_model * 4,
                 query_dimensions=d_query,
                 value_dimensions=d_query,
                 dropout=dropout,
@@ -69,8 +78,8 @@ class SResTransformer(torch.nn.Module):
 
         self.encoder.to('cuda')
         
-        self.predictor_amp = torch.nn.Linear(n_heads * d_query,interpolation_size//10)
-        self.predictor_phase = torch.nn.Linear(n_heads * d_query,interpolation_size//10)
+        self.predictor_amp = torch.nn.Linear(d_model//2,self.no_of_sectors)
+        self.predictor_phase = torch.nn.Linear(d_model//2,self.no_of_sectors)
         
     
     def get_interpolated_rings(self, fc):
@@ -86,9 +95,9 @@ class SResTransformer(torch.nn.Module):
                 torch.Tensor: Interpolated input tensor of shape (batch_size, num_channels, interpolation_size, num_rings).
             """
             permuted_fc = fc.clone().permute(0,2,1)#batch,2,tokens
-                        #interpolation size should be multiple of 10 for easy calculation #14*3.14 = 44-->50
+                        #interpolation size should be multiple of self.no_of_sectors for easy calculation #14*3.14 = 44-->50
                         
-            # interpolated_fc = torch.zeros(size=(fc.shape[0],2,self.interpolation_size,len(model.sres.fc_per_ring.keys()))).to('cuda')
+
             r = 0
             selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
             permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]  
@@ -102,41 +111,66 @@ class SResTransformer(torch.nn.Module):
             return interpolated_fc
 
     def get_largest_semicircle(self,interpolated_fc):
-        largest_semicircle = interpolated_fc[...,:self.dft_shape[1],:]
-        largest_semicircle = largest_semicircle.permute(0,2,1,-1)  #batch,ring,2,interpolation_size
-        largest_semicircle = largest_semicircle.reshape(interpolated_fc.shape[0],-1,2*(self.interpolation_size//10))
+        largest_semicircle = interpolated_fc[...,:self.dft_shape[1],:] #32,2,19,50 --> 32,2,14,50
         return largest_semicircle
     
+    def get_amp_phase(self,input_tensor):
+        amps = input_tensor[...,0].reshape(*input_tensor.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+        phases = input_tensor[...,1].reshape(*input_tensor.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+        return amps,phases
+
     def get_lowres_input(self, highres_input):
         s = (self.shells * 2 * self.interpolation_size //100)
         lowres_input = highres_input[:,:,:s,:]
-        lowres_input = lowres_input.permute(0,2,1,-1)  #batch,ring,2,interpolation_size
-        lowres_input = lowres_input.reshape(highres_input.shape[0],-1,2*(self.interpolation_size//10))
+        lowres_input = lowres_input.permute(0,2,1,-1) 
+        lowres_input = lowres_input.reshape(highres_input.shape[0],-1,2*(self.interpolation_size//self.no_of_sectors))
         return lowres_input
+    
+    def embed_tensor(self, input_tensor):
+        amps, phases = self.get_amp_phase(input_tensor) #32,19,50,2 --> (32,19,5,10,1), (32,19,5,10,1)
+        tokenised_amps = self.embed_amps(amps) #32,19,5,10,1 --> 32,19,5,64
+        tokenised_phases = self.embed_phi(phases) #32,19,5,10,1 --> 32,19,5,64
+        tokenised_tensor =  torch.cat([tokenised_amps,tokenised_phases],dim = -1) #32,19,5,64 + 32,19,5,64 --> 32,19,5,128
+        tokenised_tensor = tokenised_tensor.reshape(tokenised_tensor.shape[0],-1,self.d_model//2) #32,19,5,128 --> 32,95,128
+
+        return tokenised_tensor
+        
+        
 
     def forward(self, fc):
 
-        interpolated_fc = self.get_interpolated_rings(fc)
-
-        largest_semicircle = self.get_largest_semicircle(interpolated_fc)
-
-        pred = self.model_forward(largest_semicircle[:,:-1,:]) #batch,tokens,2
+        interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50
         
-        output = torch.cat([largest_semicircle[:,:1,:],pred],dim = 1)
+        if self.semicircle_only_flag:
+            input_ = self.get_largest_semicircle(interpolated_fc).permute(0,2,-1,1)  #32,19,50,2 --> 32,14,50,2
         
-        output = self.get_full_plane_from_sectors(output,interpolated_fc)
+        else:
+            input_ = interpolated_fc.clone().permute(0,2,-1,1)  #32,19,50,2 
         
-        final_output = self.get_de_interpolated_rings(output)
+        embedded_tensor = self.embed_tensor(input_) #32,19,50,2 --> 32,95,128
 
+        embedded_tensor_positional = self.pos_embedding(embedded_tensor) #32,95,128 --> 32,95,256 
+        
+        encoder_output = self.encoder_forward(embedded_tensor_positional) #32,95,256 --> 32,95,256
+        
+        pred = torch.cat([input_.reshape(*input_.shape[:1],-1,self.no_of_sectors,2)[:,:1,:,:],encoder_output[:,:-1,:,:]], dim=1) #32,1,10,1 + 32,94,10,1 --> 32,95,10,2
+        
+        if self.semicircle_only_flag:
+            pred = self.get_full_plane_from_sectors(pred,interpolated_fc)
+        else:
+            pred = pred.reshape(pred.shape[0],-1,self.interpolation_size,2).permute(0,3,1,2) #32,95,10,2 --> 32,19,50,2 --> 32,2,19,50
+        
+        model_output = self.get_de_interpolated_rings(pred)
 
-        return final_output
+        return model_output
     
 
     def get_full_plane_from_sectors(self,output,interpolated_fc):
          #batch,ring,2,interpolation_size
         output = output.reshape(interpolated_fc.shape[0],-1,2,self.interpolation_size) #batch,2, ring,self.interpolation_size
         output = output.permute(0,2,1,3)
-        output = torch.cat([output, interpolated_fc[...,self.dft_shape[1]:,:]],dim = -2) #batch,2,interpolation_size,ring
+        if self.semicircle_only_flag:
+            output = torch.cat([output, interpolated_fc[...,self.dft_shape[1]:,:]],dim = -2) #batch,2,interpolation_size,ring
         return output
     
     def get_de_interpolated_rings(self,output):
@@ -146,22 +180,28 @@ class SResTransformer(torch.nn.Module):
         final_output = torch.cat(final_output,dim = -1).permute(0,2,1) #batch,378,2  
         return final_output
     
-    def forward_inference(self, fc, max_seq_length):
+    def forward_inference(self, fc, max_seq_length = None):
         
-        interpolated_fc = self.get_interpolated_rings(fc)
+        interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50
+
+        if max_seq_length == None:
+            max_seq_length = len(list(self.fc_per_ring.keys()))*self.interpolation_size//self.no_of_sectors 
 
         lowres_input = self.get_lowres_input(interpolated_fc)
 
-        pred = self.model_forward_inference(lowres_input, max_seq_length= max_seq_length) #batch,tokens,2
-        
-        
-        output = self.get_full_plane_from_sectors(pred,interpolated_fc)
-        
-        final_output = self.get_de_interpolated_rings(output)
+        embedded_tensor = self.embed_tensor(lowres_input)
 
-        return final_output
+        embedded_tensor_positional = self.pos_embedding(embedded_tensor)
+        
+        encoder_output = self.encoder_forward(embedded_tensor_positional) #32,14,2,50 --> 32,14,2,50 
+        
+        pred = torch.cat([lowres_input.reshape(*lowres_input.shape[:1],-1,self.no_of_sectors,2)[:,:1,:,:],encoder_output[:,:-1,:,:]], dim=1)
+        
+        model_output = self.get_de_interpolated_rings(pred)
+
+        return model_output
     
-    def model_forward_inference(self, x,max_seq_length=140): #(32,39,256)
+    def encoder_inference(self, x,max_seq_length = 95): #(32,39,256)
         with torch.no_grad():
             x_hat = x.clone()
             for i in range(x.shape[1],max_seq_length):
@@ -172,14 +212,11 @@ class SResTransformer(torch.nn.Module):
         assert (x_hat[:,:x.shape[1]] == x).all()
         return x_hat
     
-    def model_forward(self, x):
-
-        x = self.fourier_coefficient_embedding(x) #shape = 377,2 --> 377,128
-        x = self.pos_embedding(x) #shape 377,128 --> 377,256
-        
+    def encoder_forward(self, x):
         if self.model_type == 'mamba':
             y_hat = self.encoder(inputs_embeds = x)
             y_hat = y_hat.last_hidden_state
+        
         if self.model_type == 'torch':
             triangular_mask = TriangularCausalMask(x.shape[1], device=x.device)
             mask = triangular_mask.additive_matrix_finite
@@ -190,12 +227,10 @@ class SResTransformer(torch.nn.Module):
             mask = triangular_mask
             y_hat = self.encoder(x, attn_mask=mask)
 
-        y_amp = 2*torch.tanh(self.predictor_amp(y_hat))
-        y_amp = torch.clip(y_amp,-1.,1.)
-        y_phase = 2*torch.tanh(self.predictor_phase(y_hat))
-        y_phase = torch.clip(y_phase,-1.,1.)
-
-        return torch.stack([y_amp, y_phase], dim=-1).reshape(x.shape[0], x.shape[1], -1) #shape 377,5,2 --> 377,5,2 --> 377,10
+        y_amp = torch.tanh(self.predictor_amp(y_hat[...,:y_hat.shape[-1]//2]))
+        y_phase = torch.tanh(self.predictor_phase(y_hat[...,y_hat.shape[-1]//2:]))
+        return torch.stack([y_amp,y_phase],dim = -1)
+        # return torch.stack([y_amp, y_phase], dim=-1).reshape(x.shape[0], x.shape[1], -1) 
     
 
 
