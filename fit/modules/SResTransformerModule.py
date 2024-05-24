@@ -88,7 +88,17 @@ class SResTransformerModule(LightningModule):
         self.val_outputs_list = []  #for storing outputs of validation epoch
 
 
-        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) * 10 
+        self.interpolation_size = math.ceil(math.pi * self.dft_shape[1] / 10) * 10
+
+        x, y = np.meshgrid(
+            range(self.dft_shape[1]),
+            range(-self.dft_shape[0] // 2, self.dft_shape[0] // 2 + 1))
+        radii = np.roll(np.sqrt(x**2 + y**2, dtype=np.float32),
+                        self.dft_shape[0] // 2 + 1, 0)
+        num_shells = self.shells
+        self.input_seq_length = np.sum(np.round(radii) < num_shells)
+
+
         # Initialize the SResTransformer Model
         self.sres = SResTransformer(
             d_model=self.hparams.n_heads * self.hparams.d_query,
@@ -101,17 +111,13 @@ class SResTransformerModule(LightningModule):
             d_query=self.hparams.d_query,
             dropout=self.hparams.dropout,
             fc_per_ring=self.fc_per_ring,
+            shells=self.shells,
             dft_shape=self.dft_shape,
             attention_dropout=self.hparams.attention_dropout,
             interpolation_size = self.interpolation_size)
+        
 
-        x, y = np.meshgrid(
-            range(self.dft_shape[1]),
-            range(-self.dft_shape[0] // 2, self.dft_shape[0] // 2 + 1))
-        radii = np.roll(np.sqrt(x**2 + y**2, dtype=np.float32),
-                        self.dft_shape[0] // 2 + 1, 0)
-        num_shells = self.shells
-        self.input_seq_length = np.sum(np.round(radii) < num_shells)
+        
         
 
     def forward(self, x):
@@ -121,6 +127,7 @@ class SResTransformerModule(LightningModule):
         optimizer = RAdam(self.sres.parameters(),
                           lr=self.hparams.lr,
                           weight_decay=self.hparams.weight_decay)
+        
         scheduler = ReduceLROnPlateau(optimizer,
                                       mode='min',
                                       factor=0.5,
@@ -129,7 +136,7 @@ class SResTransformerModule(LightningModule):
                                       min_lr=1e-5)
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler,
+            # 'lr_scheduler': scheduler,
             'monitor': 'Train/train_mean_epoch_phi_loss'
         }
 
@@ -171,24 +178,24 @@ class SResTransformerModule(LightningModule):
             torch.tensor([x['phi_loss'] for x in self.train_outputs_list]))
         weighted_phi_loss = torch.mean(
             torch.tensor([x['weighted_phi_loss'] for x in self.train_outputs_list]))
+        
         self.log('Train/train_mean_epoch_loss',
-                 loss,
+                 loss.to('cuda'),
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_amp_loss',
-                 amp_loss,
+                 amp_loss.to('cuda'),
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_phi_loss',
-                 phi_loss,
+                 phi_loss.to('cuda'),
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_weighted_phi_loss',
-                 weighted_phi_loss,
+                 weighted_phi_loss.to('cuda'),
                  logger=True,
                  on_epoch=True)
         
-
         self.train_outputs_list = []
 
     def log_val_images(self, fc, mag_min, mag_max):
@@ -216,19 +223,18 @@ class SResTransformerModule(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        x_fc = fc[:, self.dst_flatten_order][:, :-1]
-        y_fc = fc[:, self.dst_flatten_order][:, 1:]
+        fc = fc[:, self.dst_flatten_order].to('cuda')
 
-        pred_gt = fc[:, self.dst_flatten_order].clone()
-        pred = self.sres.forward(x_fc)
-        pred_gt[:,1:] = pred 
+        y_hat = self.sres.forward_inference(fc,140)
+
         
-        val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(pred, y_fc, mag_min,
+        val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(y_hat, fc, mag_min,
                                                       mag_max)
 
-        if self.current_epoch % 25 == 0 and batch_idx == 0 and self.logger._name != 'lightning_logs':
-            self.save_forward_func_output(pred_gt, mag_min, mag_max)
+        if self.current_epoch % 5 == 0 and batch_idx == 0:# and self.logger._name != 'lightning_logs':
+            self.save_forward_func_output(y_hat, mag_min, mag_max)
             self.log_val_images(fc, mag_min, mag_max)
+        
         output = {
             'val_loss': val_loss,
             'val_amp_loss': amp_loss,
@@ -298,13 +304,18 @@ class SResTransformerModule(LightningModule):
 
     def test_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
+        fc = fc[:, self.dst_flatten_order].to('cuda')
+        
         lowres_img, pred_img, gt_img = self.predict_and_get_lowres_pred_gt(
             fc, mag_min, mag_max)
+        
         lowres_psnr = PSNR(gt_img, lowres_img)
         pred_psnr = PSNR(gt_img, pred_img)
+        
         self.test_outputs = [
             lowres_psnr, pred_psnr, pred_img, lowres_img, gt_img
         ]
+        
         return (lowres_psnr, pred_psnr)
 
     def on_test_epoch_end(self):
@@ -334,8 +345,7 @@ class SResTransformerModule(LightningModule):
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
-        input_ = fc[:, self.dst_flatten_order][:, :self.input_seq_length]
-        pred = self.sres.forward_inference(input_, len(fc[0]))
+        pred = self.sres.forward_inference(fc, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(
             fc, pred, mag_min, mag_max)
         return lowres_img, pred_img, gt_img
@@ -344,16 +354,12 @@ class SResTransformerModule(LightningModule):
         pred_img = self.convert2img(
             pred, mag_min=mag_min, mag_max=mag_max
         )  #no need for [dst_flatten_order] as x_fc was made that way
-        lowres = torch.zeros_like(pred)
-        lowres += fc.mean()
-        lowres[:, :self.
-               input_seq_length] = fc[:,
-                                      self.dst_flatten_order][:, :self.
-                                                              input_seq_length]
+        lowres = fc.clone()
+        lowres[:, :self.input_seq_length] = 0.
         lowres_img = self.convert2img(fc=lowres,
                                       mag_min=mag_min,
                                       mag_max=mag_max)
-        gt_img = self.convert2img(fc=fc[:, self.dst_flatten_order],
+        gt_img = self.convert2img(fc=fc,
                                   mag_min=mag_min,
                                   mag_max=mag_max)
         lowres_img_denormed = denormalize(lowres_img,

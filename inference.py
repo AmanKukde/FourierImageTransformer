@@ -43,7 +43,7 @@ class Inference:
                 save_location=save_loc)
 
     def _load_model_from_ckpt_path(self, ckpt_path):
-        #/home/aman.kukde/Projects/FourierImageTransformer/models/CelebA/fast/sum/Fast_CelebA_wp_1000_sum_L_8_H_8_s_10_subset_False_Contd._08_04-18_18_18_29-04_18-32-39/epoch=1461-step=2130000.ckpt
+        #/home/aman.kukde/Projects/FourierImageTransformer/models/MNIST/mamba/sum/Mamba_MNIST_wp_1000_sum_L_8_H_8_s_10_subset_False_23-05_11-56-51/epoch=80-step=69660.ckpt
         ckpt_path = ckpt_path
         dataset = ckpt_path.split('/')[-5]
         model_type = ckpt_path.split('/')[-4]
