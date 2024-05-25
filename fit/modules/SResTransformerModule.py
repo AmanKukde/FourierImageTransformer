@@ -348,7 +348,7 @@ class SResTransformerModule(LightningModule):
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
-        pred = self.sres.forward_inference(fc, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
+        pred = self.sres.forward_i(fc)#, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(
             fc, pred, mag_min, mag_max)
         return lowres_img, pred_img, gt_img

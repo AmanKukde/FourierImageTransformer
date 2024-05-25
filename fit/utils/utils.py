@@ -268,3 +268,19 @@ def cart2pol(x, y):
     r = torch.sqrt(x ** 2 + y ** 2)
     phi = torch.atan2(y, x)
     return r, phi
+
+
+# import os
+# import shutil
+
+
+# for i in os.listdir('/home/aman.kukde/Projects/FourierImageTransformer/models/'):
+#     for j in os.listdir('/home/aman.kukde/Projects/FourierImageTransformer/models/'+i):
+#         for k in os.listdir('/home/aman.kukde/Projects/FourierImageTransformer/models/'+i+'/'+j):
+#                 for l in os.listdir('/home/aman.kukde/Projects/FourierImageTransformer/models/'+i+'/'+j+'/'+k):
+#                     try:
+#                         if 'wandb' not in os.listdir('/home/aman.kukde/Projects/FourierImageTransformer/models/'+i+'/'+j+'/'+k+'/'+l):
+#                            shutil.rmtree('/home/aman.kukde/Projects/FourierImageTransformer/models/'+i+'/'+j+'/'+k+'/'+l)
+#                     except FileNotFoundError:
+#                         pass
+                        
