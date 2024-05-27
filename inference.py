@@ -53,7 +53,7 @@ class Inference:
 
         if dataset == "MNIST":
             dm = MNIST_SResFITDM(root_dir="./datamodules/data/",
-                                 batch_size=32,
+                                 batch_size=64,
                                  subset_flag=False)
         if dataset == "CelebA":
             dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
@@ -93,8 +93,8 @@ class Inference:
             fc = fc.cuda()
             mag_min = mag_min.cuda()
             mag_max = mag_max.cuda()
-            x_fc = fc[:, flatten_order][:, :model.input_seq_length].cuda()
-            pred = model.sres.forward_inference(x_fc)
+            x_fc = fc[:, flatten_order]
+            pred = model.sres.forward_i(x_fc)
 
             pred_img = model.convert2img(fc=pred,
                                          mag_min=mag_min,

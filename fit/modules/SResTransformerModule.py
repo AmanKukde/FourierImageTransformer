@@ -226,9 +226,9 @@ class SResTransformerModule(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        fc = fc[:, self.dst_flatten_order].to('cuda')
+        fc = fc[:, self.dst_flatten_order]
 
-        y_hat = self.sres.forward_inference(fc,140)
+        y_hat = self.sres.forward_i(fc)
 
         
         val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(y_hat, fc, mag_min,
