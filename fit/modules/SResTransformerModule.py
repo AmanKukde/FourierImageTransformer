@@ -211,18 +211,18 @@ class SResTransformerModule(LightningModule):
         pred_ = torch.clamp(
             (pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0,
             1)
-        # self.logger.experiment.log({
-        #     f"Validation_Images/val_input_image":
-        #     [wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],
-        #     "global_step":
-        #     self.trainer.global_step
-        # })
-        # self.logger.experiment.log({
-        #     f"Validation_Images/val_pred_image":
-        #     [wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],
-        #     "global_step":
-        #     self.trainer.global_step
-        # })
+        self.logger.experiment.log({
+            f"Validation_Images/val_input_image":
+            [wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],
+            "global_step":
+            self.trainer.global_step
+        })
+        self.logger.experiment.log({
+            f"Validation_Images/val_pred_image":
+            [wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],
+            "global_step":
+            self.trainer.global_step
+        })
 
     def validation_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
