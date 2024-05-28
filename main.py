@@ -90,7 +90,7 @@ if __name__ == "__main__":
         num_shells=args.n_shells,
         w_phi=args.w_phi,
         job_id = args.job_id
-    )
+    ).cuda()
     print(f"\n\n\n\n{model}\n\n\n\n")
 
     models_save_path = f"{args.models_save_path}/{args.dataset}/{args.model_type}/{args.loss}"
