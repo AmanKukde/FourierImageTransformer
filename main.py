@@ -51,7 +51,7 @@ if __name__ == "__main__":
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--no_of_sectors", type=int, default=10)
+    parser.add_argument("--no_of_sectors", type=int, default=1)
     parser.add_argument("--semi_circle_only_flag", action="store_true", help="Use only semi-circle in the model", default=False)
     args = parser.parse_args()
 
@@ -107,9 +107,10 @@ if __name__ == "__main__":
         w = f"wp_{int(args.w_phi)}"
     if args.resume_training_from_checkpoint != None :
         args.note += f"Contd_{args.resume_training_from_checkpoint.split('/')[-2].split('_')[-1]}"
-        
 
-    name = str.capitalize(args.model_type) + f"_{args.dataset}_{w}_{args.loss}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_{args.note}" + \
+    args.note+="SectorEncoder" 
+
+    name = str.capitalize(args.model_type) + f"_{args.dataset}_{w}_{args.loss}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_{args.note}_NSec{args.no_of_sectors}" + \
         datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
     if args.wandb:

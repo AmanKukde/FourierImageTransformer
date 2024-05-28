@@ -66,7 +66,7 @@ class SResTransformerModule(LightningModule):
                                   "weight_decay", "w_phi", "n_layers","no_of_sectors",
                                   "n_heads", "d_query", "reduceLR_patience",
                                   "reduceLR_factor", "num_shells",
-                                  "attention_dropout", "dropout", "job_id","semi_circle_only_flag")
+                                  "attention_dropout", "dropout", "job_id","semi_circle_only_flag","no_of_sectors")
 
         # Set the loss function based on the input loss type
         if loss == 'prod':
@@ -211,18 +211,18 @@ class SResTransformerModule(LightningModule):
         pred_ = torch.clamp(
             (pred[i].unsqueeze(0) - pred.min()) / (pred.max() - pred.min()), 0,
             1)
-        self.logger.experiment.log({
-            f"Validation_Images/val_input_image":
-            [wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],
-            "global_step":
-            self.trainer.global_step
-        })
-        self.logger.experiment.log({
-            f"Validation_Images/val_pred_image":
-            [wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],
-            "global_step":
-            self.trainer.global_step
-        })
+        # self.logger.experiment.log({
+        #     f"Validation_Images/val_input_image":
+        #     [wandb.Image(lowres_.cpu(), caption=f"inputs/img_{i}")],
+        #     "global_step":
+        #     self.trainer.global_step
+        # })
+        # self.logger.experiment.log({
+        #     f"Validation_Images/val_pred_image":
+        #     [wandb.Image(pred_.cpu(), caption=f"predictions/img_{i}")],
+        #     "global_step":
+        #     self.trainer.global_step
+        # })
 
     def validation_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
@@ -251,14 +251,14 @@ class SResTransformerModule(LightningModule):
 
     def save_forward_func_output(self, pred, mag_min, mag_max):
         pred_img = self.convert2img(pred, mag_min, mag_max)
-        self.logger.experiment.log({
-            f"Validation_Images/val_fwd_fnc_output": [
-                wandb.Image(pred_img[0].cpu(),
-                            caption=f"pred_of_forward_method")
-            ],
-            "global_step":
-            self.trainer.global_step
-        })
+        # self.logger.experiment.log({
+        #     f"Validation_Images/val_fwd_fnc_output": [
+        #         wandb.Image(pred_img[0].cpu(),
+        #                     caption=f"pred_of_forward_method")
+        #     ],
+        #     "global_step":
+        #     self.trainer.global_step
+        # })
 
     def on_validation_epoch_end(self):
         val_loss = torch.mean(
@@ -348,6 +348,10 @@ class SResTransformerModule(LightningModule):
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
+        fc = fc.to('cuda')
+        mag_min = mag_min.to('cuda')
+        mag_max = mag_max.to('cuda')
+        fc = fc[:, self.dst_flatten_order]
         pred = self.sres.forward_i(fc)#, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(
             fc, pred, mag_min, mag_max)

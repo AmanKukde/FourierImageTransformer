@@ -1,4 +1,5 @@
 from os.path import join, exists
+from re import sub
 from typing import Optional, Union, List
 
 import numpy as np
@@ -42,12 +43,12 @@ class SResFITDataModule(LightningDataModule):
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train')),#, amp_min=self.mag_min,
                                         #   amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+            batch_size=self.batch_size, num_workers=3)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
             SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation')),
-            batch_size=self.batch_size, num_workers=0)
+            batch_size=self.batch_size, num_workers=3)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
@@ -170,6 +171,12 @@ class CelebA_SResFITDM(SResFITDataModule):
         gt_train = torch.from_numpy(gt_data['gt_train'])
         gt_val = torch.from_numpy(gt_data['gt_val'])
         gt_test = torch.from_numpy(gt_data['gt_test'])
+
+        if self.subset_flag:
+            print("Using subset of CelebA dataset")
+            gt_train = gt_train[:300, :, :]
+            gt_val = gt_train.clone()
+
         self.mean = gt_train.mean()
         self.std = gt_train.std()
 
