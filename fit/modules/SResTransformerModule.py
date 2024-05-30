@@ -36,7 +36,8 @@ class SResTransformerModule(LightningModule):
                  w_phi=1,
                  reduceLR_patience=20,
                  reduceLR_factor=0.5,
-                 job_id=''):
+                 job_id='',
+                 total_gpus=1):
         super().__init__()
 
         self.model_type = model_type
@@ -56,7 +57,7 @@ class SResTransformerModule(LightningModule):
                                   "weight_decay", "w_phi", "n_layers",
                                   "n_heads", "d_query", "reduceLR_patience",
                                   "reduceLR_factor", "num_shells",
-                                  "attention_dropout", "dropout", "job_id")
+                                  "attention_dropout", "dropout", "job_id", "total_gpus")
 
         # Set the loss function based on the input loss type
         if loss == 'prod':

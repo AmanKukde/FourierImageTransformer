@@ -13,20 +13,21 @@
 source ~/.bashrc
 export PATH="/home/aman.kukde/miniforge3/condabin/:$PATH"
 mamba activate StateSpace
-cd /home/aman.kukde/Projects/FourierImageTransformer/
+cd /home/aman.kukde/Projects/Run/FourierImageTransformer/
 #SUM + MNIST
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "MNIST" --loss "sum" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8
-srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "MNIST" --loss "sum" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+echo "total_gpus: $SLURM_NTASKS"
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "MNIST" --loss "sum" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8
+srun python3 /home/aman.kukde/Projects/Run/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "MNIST" --loss "sum" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
 
 # SUM + CELEBA
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "CelebA" --loss "sum" --model_type "mamba" --w_phi 1000 --batch_size 16 --wandb --d_query 32 --n_layers 8 --n_heads 8 
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "CelebA" --loss "sum" --model_type "fast" --w_phi 1000 --batch_size 8 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "CelebA" --loss "sum" --model_type "mamba" --w_phi 1000 --batch_size 16 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "CelebA" --loss "sum" --model_type "fast" --w_phi 1000 --batch_size 8 --wandb --d_query 32 --n_layers 8 --n_heads 8 
 
 
 #PROD+ "MNIST"
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "MNIST" --loss "prod" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "MNIST" --loss "prod" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "MNIST" --loss "prod" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "MNIST" --loss "prod" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
 
 #PROD + CELEBA
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "CelebA" --loss p"rod" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
-# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --dataset "CelebA" --loss "prod" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "CelebA" --loss p"rod" --model_type "mamba" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 
+# srun python3 /home/aman.kukde/Projects/FourierImageTransformer/main.py --job_id $SLURM_JOB_ID --num_nodes $SLURM_JOB_NUM_NODES --total_gpus $SLURM_NTASKS --dataset "CelebA" --loss "prod" --model_type "fast" --w_phi 1000 --batch_size 32 --wandb --d_query 32 --n_layers 8 --n_heads 8 

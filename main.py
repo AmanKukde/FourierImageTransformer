@@ -24,6 +24,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--job_id", type=str, help="Job Id of Slurm Job", default="")
     parser.add_argument("--num_nodes", type=int, help="Number of nodes", default=1)
+    parser.add_argument("--total_gpus", type=int, help="Number of GPUs", default=1)
+
     parser.add_argument("--d_query", type=int, help="d_query", default=32)
     parser.add_argument("--dataset", type=str,
                         help="Dataset to be used", default="MNIST")
@@ -46,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument("--w_phi", type=float,
                         help="Weight for phi loss", default=1000)
     parser.add_argument("--models_save_path", type=str,
-                        default="/home/aman.kukde/Projects/FourierImageTransformer/models")
+                        default="/home/aman.kukde/Projects/Runs/FourierImageTransformer/models")
     parser.add_argument("--resume_training_from_checkpoint",
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
@@ -89,7 +91,8 @@ if __name__ == "__main__":
         n_layers=args.n_layers,
         num_shells=args.n_shells,
         w_phi=args.w_phi,
-        job_id = args.job_id
+        job_id = args.job_id,
+        total_gpus = args.total_gpus
     ).cuda()
     print(f"\n\n\n\n{model}\n\n\n\n")
 

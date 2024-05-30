@@ -33,27 +33,25 @@ class SResFITDataModule(LightningDataModule):
         self.mag_max = None
 
     def setup(self, stage: Optional[str] = None):
-        tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=None,
-                                                 amp_max=None)
-        self.mag_min = tmp_fcds.amp_min
-        self.mag_max = tmp_fcds.amp_max
+        tmp_fcds = SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'))#, amp_min=None,
+                                                 #amp_max=None)
+        # self.mag_min = tmp_fcds.amp_min
+        # self.mag_max = tmp_fcds.amp_max
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
         return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='train')),#, amp_min=self.mag_min,
+                                        #   amp_max=self.mag_max),
+            batch_size=self.batch_size, num_workers=3)
 
     def val_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
-            batch_size=self.batch_size, num_workers=0)
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='validation')),
+            batch_size=self.batch_size, num_workers=3)
 
     def test_dataloader(self, *args, **kwargs) -> Union[DataLoader, List[DataLoader]]:
         return DataLoader(
-            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test'), amp_min=self.mag_min,
-                                          amp_max=self.mag_max),
+            SResFourierCoefficientDataset(self.gt_ds.create_torch_dataset(part='test')),
             batch_size=self.batch_size)
 
 
@@ -81,8 +79,7 @@ class MNIST_SResFITDM(SResFITDataModule):
 
         if self.subset_flag:
             print("Using subset of MNIST dataset")
-            mnist_train = mnist_train_val[114, 1:, 1:]
-            mnist_train = torch.tile(mnist_train, (self.batch_size*100, 1, 1))
+            mnist_train = mnist_train_val[:150, 1:, 1:]
             mnist_val = mnist_train.clone()
         else :
             print("Using Full MNIST dataset")
@@ -173,6 +170,12 @@ class CelebA_SResFITDM(SResFITDataModule):
         gt_train = torch.from_numpy(gt_data['gt_train'])
         gt_val = torch.from_numpy(gt_data['gt_val'])
         gt_test = torch.from_numpy(gt_data['gt_test'])
+
+        if self.subset_flag:
+            print("Using subset of CelebA dataset")
+            gt_train = gt_train[:300, :, :]
+            gt_val = gt_train.clone()
+
         self.mean = gt_train.mean()
         self.std = gt_train.std()
 
@@ -252,16 +255,17 @@ class BioSRFActin(SResFITDataModule):
     def __init__(self, root_dir, batch_size, subset_flag=False):
         self.subset_flag = subset_flag
         self.batch_size = batch_size
-        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=1003)
+        super().__init__(root_dir=root_dir, batch_size=batch_size, gt_shape=1505)
 
     def prepare_data(self, *args, **kwargs):
         images = read_mrc.read_mrc('/group/jug/ashesh/data/BioSR/F-actin_Nonlinear/GT_all_b.mrc')[1]
         images = torch.permute(torch.from_numpy(images).type(torch.float32),(2,0,1))
-        images = resize(images, (129, 129))
+        # images = resize(images, (129, 129))
+        l = len(images)
         np.random.seed(1612)
-        gt_train = images[:45]
-        gt_val = images[45:50]
-        gt_test = images[50:]
+        gt_train = images[:81*l//100,1:,1:]
+        gt_val = images[81*l//100:9*l//10,1:,1:]
+        gt_test = images[9*l//10:,1:,1:]
         
         self.mean = images.mean()
         self.std = images.std()

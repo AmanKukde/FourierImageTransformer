@@ -27,13 +27,6 @@ class SResTransformer(torch.nn.Module):
         ) 
         self.model_type = model_type
 
-        # if self.model_type == 'mamba':
-        #     conf = MambaConfig()
-        #     conf.num_hidden_layers = 24
-        #     conf.expand = 4
-        #     conf.hidden_size = 2
-        #     conf.intermediate_size =128
-        #     self.encoder = MambaModel(conf)
 
         if self.model_type == 'mamba':
             conf = MambaConfig()
@@ -81,7 +74,7 @@ class SResTransformer(torch.nn.Module):
             mask = triangular_mask
             y_hat = self.encoder(x, attn_mask=mask)
 
-        y_amp = self.predictor_amp(y_hat)
+        y_amp = torch.tanh(self.predictor_amp(y_hat))
         y_phase = torch.tanh(self.predictor_phase(y_hat))
         return torch.cat([y_amp, y_phase], dim=-1)
     
