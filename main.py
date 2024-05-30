@@ -48,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument("--w_phi", type=float,
                         help="Weight for phi loss", default=1000)
     parser.add_argument("--models_save_path", type=str,
-                        default="/home/aman.kukde/Projects/Runs/FourierImageTransformer/models")
+                        default="/home/aman.kukde/Projects/Trained_Models/")
     parser.add_argument("--resume_training_from_checkpoint",
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
