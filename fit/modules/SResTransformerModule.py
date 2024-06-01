@@ -151,13 +151,13 @@ class SResTransformerModule(LightningModule):
 
     def on_train_epoch_end(self):
         loss = torch.mean(
-            torch.tensor([x['loss'] for x in self.train_outputs_list]))
+            torch.tensor([x['loss'] for x in self.train_outputs_list])).to('cuda')
         amp_loss = torch.mean(
-            torch.tensor([x['amp_loss'] for x in self.train_outputs_list]))
+            torch.tensor([x['amp_loss'] for x in self.train_outputs_list])).to('cuda')
         phi_loss = torch.mean(
-            torch.tensor([x['phi_loss'] for x in self.train_outputs_list]))
+            torch.tensor([x['phi_loss'] for x in self.train_outputs_list])).to('cuda')
         weighted_phi_loss = torch.mean(
-            torch.tensor([x['weighted_phi_loss'] for x in self.train_outputs_list]))
+            torch.tensor([x['weighted_phi_loss'] for x in self.train_outputs_list])).to('cuda')
         self.log('Train/train_mean_epoch_loss',
                  loss,
                  logger=True,
@@ -240,11 +240,11 @@ class SResTransformerModule(LightningModule):
 
     def on_validation_epoch_end(self):
         val_loss = torch.mean(
-            torch.tensor([x['val_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_loss'] for x in self.val_outputs_list])).to('cuda')
         val_amp_loss = torch.mean(
-            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list])).to('cuda')
         val_phi_loss = torch.mean(
-            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list])).to('cuda')
 
         self.log('Validation/avg_val_loss',
                  torch.mean(val_loss),

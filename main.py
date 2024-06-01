@@ -121,7 +121,7 @@ if __name__ == "__main__":
     lr_monitor = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         num_sanity_val_steps=0,
-        max_epochs=100000,
+        max_epochs=1000,
         logger=wandb_logger,
         devices = -1,
         precision='16-mixed',
