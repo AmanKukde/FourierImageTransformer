@@ -49,7 +49,9 @@ class SResTransformer(torch.nn.Module):
                 dropout=dropout,
                 attention_dropout=attention_dropout
             ).get() 
-
+        if self.model_type == 'jamba':
+            pass
+            
         self.encoder.to('cuda')
         
         self.predictor_amp = torch.nn.Linear(n_heads * d_query,1)

@@ -1,0 +1,4 @@
+name: StateSpace
+channels:
+  - conda-forge
+prefix: /localscratch/miniforge3/envs/StateSpace
