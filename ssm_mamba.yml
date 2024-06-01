@@ -1,4 +1,4 @@
-name: StateSpace_Home
+name: StateSpace
 channels:
   - nvidia
   - conda-forge
@@ -330,6 +330,7 @@ dependencies:
       - odl==0.7.0
       - orderedmultidict==1.0.1
       - pandas==2.2.1
+      - patchify==0.2.3
       - py4j==0.10.9.7
       - pytz==2024.1
       - redo==2.0.4
@@ -338,12 +339,12 @@ dependencies:
       - scikit-image==0.22.0
       - scikit-learn==1.4.1.post1
       - scipy==1.12.0
+      - seaborn==0.13.2
       - simplejson==3.19.2
       - sqlalchemy==2.0.27
       - threadpoolctl==3.3.0
       - tifffile==2024.2.12
-      - tokenizers==0.15.2
-      - transformers==4.38.1
+      - transformers
       - triton==2.2.0
       - twisted==23.10.0
       - tzdata==2024.1
