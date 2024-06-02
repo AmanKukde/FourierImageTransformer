@@ -15,7 +15,7 @@ sys.path.append("./")
 
 
 ssl._create_default_https_context = ssl._create_unverified_context
-# torch.set_float32_matmul_precision("medium")
+torch.set_float32_matmul_precision("medium")
 seed_everything(22122020)
 
 if __name__ == "__main__":
@@ -41,12 +41,12 @@ if __name__ == "__main__":
     parser.add_argument("--subset_flag", action="store_true",
                         help="Use subset of the dataset")
     parser.add_argument("--wandb", action="store_true",
-                        help="Use wandb for logging", default= False)
+                        help="Use wandb for logging", default= True)
     parser.add_argument("--note", type=str, help="note", default="")
     parser.add_argument("--w_phi", type=float,
                         help="Weight for phi loss", default=1000)
     parser.add_argument("--models_save_path", type=str,
-                        default="/home/aman.kukde/Projects/FourierImageTransformer/models")
+                        default="/group/jug/Aman/Trained_Models/")
     parser.add_argument("--resume_training_from_checkpoint",
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     args.note+="SectorEncoder" 
 
-    name = str.capitalize(args.model_type) + f"_{args.dataset}_{w}_{args.loss}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_{args.note}_NSec{args.no_of_sectors}" + \
+    name = str.capitalize(args.model_type) + f"_{args.dataset}_{w}_{args.loss}_L_{args.n_layers}_H_{args.n_heads}_s_{args.n_shells}_subset_{args.subset_flag}_{args.note}_NSec{args.no_of_sectors}_" + \
         datetime.datetime.now().strftime("%d-%m_%H-%M-%S")
 
     if args.wandb:
@@ -126,10 +126,10 @@ if __name__ == "__main__":
     lr_monitor = LearningRateMonitor(logging_interval='step')
     trainer = Trainer(
         num_sanity_val_steps=0,
-        max_epochs=10000,
+        max_epochs=1000,
         logger=wandb_logger,
         devices = -1,
-        # precision='16-mixed',
+        precision='16-mixed',
         num_nodes = args.num_nodes,
         strategy=DDPStrategy(find_unused_parameters=True),
         enable_checkpointing=True,

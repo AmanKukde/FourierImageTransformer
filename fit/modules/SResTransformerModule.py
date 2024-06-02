@@ -262,11 +262,11 @@ class SResTransformerModule(LightningModule):
 
     def on_validation_epoch_end(self):
         val_loss = torch.mean(
-            torch.tensor([x['val_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_loss'] for x in self.val_outputs_list])).to('cuda')
         val_amp_loss = torch.mean(
-            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list])).to('cuda')
         val_phi_loss = torch.mean(
-            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list]))
+            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list])).to('cuda')
 
         self.log('Validation/avg_val_loss',
                  torch.mean(val_loss),

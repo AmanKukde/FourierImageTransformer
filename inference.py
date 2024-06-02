@@ -43,7 +43,7 @@ class Inference:
                 save_location=save_loc)
 
     def _load_model_from_ckpt_path(self, ckpt_path):
-        #/home/aman.kukde/Projects/FourierImageTransformer/models/MNIST/mamba/sum/Mamba_MNIST_wp_1000_sum_L_8_H_8_s_10_subset_False_23-05_11-56-51/epoch=80-step=69660.ckpt
+        #/home/aman.kukde/Projects/FourierImageTransformer/models/CelebA/fast/sum/Fast_CelebA_wp_1000_sum_L_8_H_8_s_10_subset_False_Contd._08_04-18_18_18_29-04_18-32-39/epoch=1461-step=2130000.ckpt
         ckpt_path = ckpt_path
         dataset = ckpt_path.split('/')[-5]
         model_type = ckpt_path.split('/')[-4]
@@ -53,7 +53,7 @@ class Inference:
 
         if dataset == "MNIST":
             dm = MNIST_SResFITDM(root_dir="./datamodules/data/",
-                                 batch_size=64,
+                                 batch_size=32,
                                  subset_flag=False)
         if dataset == "CelebA":
             dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
@@ -93,8 +93,8 @@ class Inference:
             fc = fc.cuda()
             mag_min = mag_min.cuda()
             mag_max = mag_max.cuda()
-            x_fc = fc[:, flatten_order]
-            pred = model.sres.forward_i(x_fc)
+            x_fc = fc[:, flatten_order][:, :model.input_seq_length].cuda()
+            pred = model.sres.forward_inference(x_fc)
 
             pred_img = model.convert2img(fc=pred,
                                          mag_min=mag_min,
