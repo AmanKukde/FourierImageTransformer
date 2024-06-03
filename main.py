@@ -15,7 +15,7 @@ sys.path.append("./")
 
 
 ssl._create_default_https_context = ssl._create_unverified_context
-torch.set_float32_matmul_precision("medium")
+# torch.set_float32_matmul_precision("medium")
 seed_everything(22122020)
 
 if __name__ == "__main__":
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         max_epochs=1000,
         logger=wandb_logger,
         devices = -1,
-        precision='16-mixed',
+        # precision='16-mixed',
         num_nodes = args.num_nodes,
         strategy=DDPStrategy(find_unused_parameters=True),
         enable_checkpointing=True,

@@ -59,7 +59,7 @@ class SResFourierCoefficientDataset(Dataset):
 
         
         fc = torch.stack([img_amp.flatten(), img_phi.flatten()], dim=-1)
-        return fc, (amp_min.unsqueeze(-1), amp_max.unsqueeze(-1))
+        return fc, (amp_min.unsqueeze(-1), amp_max.unsqueeze(-1)),img
     
     def __len__(self):
         return len(self.ds)
