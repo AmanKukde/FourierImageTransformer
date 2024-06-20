@@ -77,8 +77,8 @@ class SResTransformer(torch.nn.Module):
 
         self.encoder.to('cuda')
         
-        self.predictor_amp = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors)))
-        self.predictor_phase = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors)))
+        self.predictor_amp = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors))
+        self.predictor_phase = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors))
         
     
     def get_interpolated_rings(self, fc):
