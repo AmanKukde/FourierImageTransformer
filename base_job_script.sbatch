@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=fit
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=aman.kukde@visitaors.fht.org
+#SBATCH --mail-user=aman.kukde@visitors.fht.org
 #SBATCH --partition=gpuq
-#SBATCH --time=04-00:00:00
-#SBATCH --nodes=1
+#SBATCH --time=06-00:00:00
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=2
 #SBATCH --gpus-per-node=2
 #SBATCH --cpus-per-task=8

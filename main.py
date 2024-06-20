@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_heads", type=int,
                         help="No of heads in the transformer", default=8)
     parser.add_argument("--n_shells", type=int,
-                        help="Number of shells used as lowres-input in the transformer", default=10)
+                        help="Number of shells used as lowres-input in the transformer", default=5)
     parser.add_argument("--subset_flag", action="store_true",
                         help="Use subset of the dataset")
     parser.add_argument("--wandb", action="store_true",
@@ -51,7 +51,7 @@ if __name__ == "__main__":
                         type=str, default=None)
     parser.add_argument("--model_weights", type=str,default='')
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--no_of_sectors", type=int, default=1)
+    parser.add_argument("--no_of_sectors", type=int, default=10)
     parser.add_argument("--semi_circle_only_flag", action="store_true", help="Use only semi-circle in the model", default=False)
     args = parser.parse_args()
 

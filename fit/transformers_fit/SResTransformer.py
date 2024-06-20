@@ -11,7 +11,6 @@ import numpy as np
 from torch.nn.functional import avg_pool3d, interpolate
 import math
 
-   
 class SResTransformer(torch.nn.Module):
     def __init__(self,
                  d_model,
@@ -78,20 +77,18 @@ class SResTransformer(torch.nn.Module):
 
         self.encoder.to('cuda')
         
-        self.predictor_amp = torch.nn.Linear(d_model//2,self.no_of_sectors)
-        self.predictor_phase = torch.nn.Linear(d_model//2,self.no_of_sectors)
+        self.predictor_amp = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors)))
+        self.predictor_phase = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors)))
         
     
     def get_interpolated_rings(self, fc):
             """
-            Embeds the sectors of the largest semicircle of the input fourier coefficients tensor.
-            Returned x is from 0 to -2 token of the input tensor. [:,:-1]
+            Interpolates the input feature map tensor to the desired number of rings and interpolation size.
 
             Args:
                 fc (torch.Tensor): Input feature map tensor of shape (batch_size, num_channels, height, width).
 
             Returns:
-                torch.Tensor: Embedded sectors tensor of shape (batch_size, num_sectors, embedding_size).
                 torch.Tensor: Interpolated input tensor of shape (batch_size, num_channels, interpolation_size, num_rings).
             """
             permuted_fc = fc.clone().permute(0,2,1)#batch,2,tokens #interpolation size should be multiple of self.no_of_sectors for easy calculation #14*3.14 = 44-->50
@@ -102,26 +99,44 @@ class SResTransformer(torch.nn.Module):
             interpolated_fc = interpolate(selected_ring,self.interpolation_size, mode = 'nearest-exact').unsqueeze(2)
 
             for r in list(self.fc_per_ring.keys())[1:]:
-                selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
-                permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]  
-                interpolated_fc = torch.cat([interpolated_fc,interpolate(selected_ring,self.interpolation_size, mode = 'nearest-exact').unsqueeze(2)], axis = 2)
-
+                try:
+                    selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
+                    permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]  
+                    interpolated_fc = torch.cat([interpolated_fc,interpolate(selected_ring,self.interpolation_size, mode = 'nearest-exact').unsqueeze(2)], axis = 2)
+                except:
+                    pass
             return interpolated_fc
 
     def get_largest_semicircle(self,interpolated_fc):
         largest_semicircle = interpolated_fc[...,:self.dft_shape[1],:] #32,2,19,50 --> 32,2,14,50
         return largest_semicircle
     
-    def get_amp_phase(self,input_tensor):
+    def get_amp_phase(self, input_tensor):
+        """
+        This function extracts the amplitude and phase components from the input tensor.
+        
+        Parameters:
+        - input_tensor: The input tensor from which to extract the amplitude and phase components.
+        
+        Returns:
+        amps (ndarray): The amplitude components of shape (batch_size, height, width, no_of_sectors).
+        phases (ndarray): The phase components of shape (batch_size, height, width, no_of_sectors).
+        """
         amps = input_tensor[...,0].reshape(*input_tensor.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
         phases = input_tensor[...,1].reshape(*input_tensor.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
         return amps,phases
 
-    def get_lowres_input(self, highres_input):
-        s = (self.shells * 2 * self.interpolation_size //100)
-        lowres_input = highres_input[:,:,:s,:]
+    def get_lowres_input(self, highres_input, shells = None):
+        #.set_trace()
+        if shells == None:
+            shells = self.shells
+        
+        #interpolation size is what i want all my rings to be, alsoa already a multiple of *no-of-sectors
+        #highres_input.shape = 32,2,19,50
+        lowres_input = highres_input[:,:,:shells,:]
+        # lowres_input = highres_input[:,:,:s,:]
         lowres_input = lowres_input.permute(0,2,3,1) 
-        return lowres_input #32,6,50,2
+        return lowres_input #(32,6,50,2) ; (8, 5, 110, 2)
     
     def embed_tensor(self, amps, phases): #32,19,50,2 --> (32,19,5,10,1), (32,19,5,10,1)
         tokenised_amps = self.embed_amps(amps) #32,19,5,10,1 --> 32,19,5,64
@@ -135,13 +150,15 @@ class SResTransformer(torch.nn.Module):
 
     def forward(self, fc):
         interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50
-
-        input_ = interpolated_fc.clone().permute(0,2,-1,1)  #32,19,50,2 
+        #8, 2, 45, 110
+        input_ = interpolated_fc.clone().permute(0,2,3,1)  #32,19,50,2 
         
-        amps, phases = self.get_amp_phase(input_)
+        amps = input_[...,0].reshape(*input_.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+        phases = input_[...,1].reshape(*input_.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+    
+        #* <--- !trainable portion starts here ---> 
         
-        embedded_tensor = self.embed_tensor(amps,phases) #32,19,50,2 --> 32,95,128
-
+        embedded_tensor = self.embed_tensor(amps,phases) #32,19,50,2 --> 32,95,128 ; 8,45,110,2 ---> 8,495,128
         embedded_tensor_positional = self.pos_embedding(embedded_tensor) #32,95,128 --> 32,95,256 
         
         enc_output = self.encoder_forward(embedded_tensor_positional) #32,95,256 --> 32,95,256
@@ -149,18 +166,58 @@ class SResTransformer(torch.nn.Module):
         y_amp = torch.tanh(self.predictor_amp(enc_output[...,:enc_output.shape[-1]//2])) #32,95,128 --> 32,95,10,1
         y_phase = torch.tanh(self.predictor_phase(enc_output[...,enc_output.shape[-1]//2:])) #32,95,128 --> 32,95,10,1
         
-        enc_output_amp_phi_stacked =  torch.stack([y_amp, y_phase], dim=-1) #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
+        #* <--- !trainable portion ends here ---> 
+        
+        y = torch.stack([y_amp, y_phase], dim=-1)
+
+        y_reshaped = y.reshape(input_.shape)   #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
+        
+        """
+        * since we gave model the input of 95 tokens, 
+        * we predict 'n' tokens but these are from 2nd to (last + 1) ie. index = 1 , n + 1
+        * so we will concat the first token of input with the second token to second last of the output and 
+        * discard the last token thus predicted.
+        """
+        y_corrected  = torch.cat([input_[:,:1],y_reshaped[:,:-1]], dim = 1)
+        """
+        *Need to reshape input_ so that the shapes match each other to concat. 
+        """
+    
+        pred = y_corrected.permute(0,3,1,2) #32,95,10,2 --> 32,19,50,2 --> 32,2,19,50
+        
+        model_output = self.get_de_interpolated_rings(pred) #32,2,19,50 --> 32,378,2
+        return model_output #32,378,2
+
+    # def forward(self, fc):
+        # interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50
+        #8, 2, 45, 110
+        # input_ = interpolated_fc.clone().permute(0,2,-1,1)  #32,19,50,2 
+        
+        # amps, phases = self.get_amp_phase(input_) #32,19,50,2 --> 32,19,5,10,1 + 32,19,5,10,1 
+        #8, 45, 110, 2 --> 8, 495, 10, 1 + 8, 495, 10, 1
+        
+        # embedded_tensor = self.embed_tensor(amps,phases) #32,19,50,2 --> 32,95,128
+        # #8,495,128
+        # embedded_tensor_positional = self.pos_embedding(embedded_tensor) #32,95,128 --> 32,95,256 
+        
+        # enc_output = self.encoder_forward(embedded_tensor_positional) #32,95,256 --> 32,95,256
+        
+        # y_amp = torch.tanh(self.predictor_amp(enc_output[...,:enc_output.shape[-1]//2])) #32,95,128 --> 32,95,10,1
+        # y_phase = torch.tanh(self.predictor_phase(enc_output[...,enc_output.shape[-1]//2:])) #32,95,128 --> 32,95,10,1
+        
+        # enc_output_amp_phi_stacked =  torch.stack([amps,phases], dim=-1) #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
+        # enc_output_amp_phi_stacked =  torch.stack([y_amp, y_phase], dim=-1) #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
         
         #since we gave model the input of 95 tokens, we predict 95 tokens but these are from 2nd to last+1 
         # so we will concat the first token of input with the second token to second last of the output and discard the last token thus predicted.
         ## Need to reshape input_ so that the shapes match each other to concat. 
-        pred = torch.cat([input_.reshape(*input_.shape[:1],-1,self.no_of_sectors,2)[:,:1,:,:],enc_output_amp_phi_stacked[:,:-1,:,:]], dim=1) #32,1,10,2 + 32,94,10,2 --> 32,95,10,2
+        # pred = torch.cat([input_.reshape(*input_.shape[:1],-1,self.no_of_sectors,2)[:,:1,:,:],enc_output_amp_phi_stacked[:,:-1,:,:]], dim=1) #32,1,10,2 + 32,94,10,2 --> 32,95,10,2
         
-        pred = pred.reshape(pred.shape[0],-1,self.interpolation_size,2).permute(0,3,1,2) #32,95,10,2 --> 32,19,50,2 --> 32,2,19,50
+        # pred = pred.reshape(pred.shape[0],-1,self.interpolation_size,2).permute(0,3,1,2) #32,95,10,2 --> 32,19,50,2 --> 32,2,19,50
         
-        model_output = self.get_de_interpolated_rings(pred) #32,2,19,50 --> 32,378,2
+        # model_output = self.get_de_interpolated_rings(pred) #32,2,19,50 --> 32,378,2
 
-        return model_output #32,378,2
+        # return model_output #32,378,2
     
 
     def get_full_plane_from_sectors(self,output,interpolated_fc):
@@ -172,45 +229,52 @@ class SResTransformer(torch.nn.Module):
     
     def get_de_interpolated_rings(self,output):
         final_output = []
-        for r in self.fc_per_ring.keys():
+        # for r in self.fc_per_ring.keys():
+        for r in range(output.shape[2]):
             final_output.append(interpolate(output[:,:,r,:],self.fc_per_ring[r], mode ="nearest-exact"))
         final_output = torch.cat(final_output,dim = -1).permute(0,2,1) #batch,378,2  
         return final_output
     
-    def forward_i(self, fc, max_seq_length = None):
+    def forward_i(self, fc, shells = None, max_seq_length = None):
         
-        interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50
-
+        interpolated_fc = self.get_interpolated_rings(fc) # 32,378,2 --> 32,2,19,50 ; 8,2016,2 --> 8,2,45,110
+        
+        input_ = interpolated_fc.clone().permute(0,2,3,1)  #32,19,50,2 ; 8,45,110,2
+        
+        x_amps = input_[...,0].reshape(*input_.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+        x_phases = input_[...,1].reshape(*input_.shape[:1],-1,self.no_of_sectors) #32,19,50,2 --> 32,19,5,10,1
+     
+        start = x_amps.shape[1]
+        
         if max_seq_length == None:
             max_seq_length = len(list(self.fc_per_ring.keys()))*self.interpolation_size//self.no_of_sectors #95
-
-        lowres_input = self.get_lowres_input(interpolated_fc) #32,19,50,2 --> 32,95,10,2
         
-        x_amps, x_phases = self.get_amp_phase(lowres_input)
-        
-        start = x_amps.shape[1]
-        for i in range(start,max_seq_length):
-
+        for token in range(start,max_seq_length):
+            #* <--- !trained portion starts here ---> 
+            
             embedded_tensor = self.embed_tensor(x_amps,x_phases) #32,95,10,2 --> 32,95,256
 
             embedded_tensor_positional = self.pos_embedding(embedded_tensor) #32,95,256
             
-            # encoder_output = self.encoder_i(embedded_tensor_positional, max_seq_length=max_seq_length) #32,10,256--> 32,95,256
             encoder_output = self.encoder_forward(embedded_tensor_positional)
 
             y_amp = torch.tanh(self.predictor_amp(encoder_output[...,:encoder_output.shape[-1]//2])) #32,95,128 --> 32,95,10,1
             y_phase = torch.tanh(self.predictor_phase(encoder_output[...,encoder_output.shape[-1]//2:])) #32,95,128 --> 32,95,10,1
-
+            
+            #* <--- !trained portion ends here ---> 
+            
             x_amps = torch.cat([x_amps,y_amp[:,-1,:].unsqueeze(1)],dim = 1) #32,30,10 --> 32,31,10
             x_phases = torch.cat([x_phases,y_phase[:,-1,:].unsqueeze(1)],dim = 1) #32,30,10 --> 32,31,10
 
-        enc_output_amp_phi_stacked =  torch.stack([x_amps, x_phases], dim=-1) #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
+        y = torch.stack([x_amps, x_phases], dim=-1)
         
-        pred = enc_output_amp_phi_stacked.reshape(enc_output_amp_phi_stacked.shape[0],-1,self.interpolation_size,2).permute(0,3,1,2) #32,95,10,2 --> 32,19,50,2 --> 32,2,19,50
+        y_reshaped = y.reshape(input_.shape[0],len(list(self.fc_per_ring.keys())),*input_.shape[2:])   #32,95,10,2 --> 32,95,10,2
+          #32,95,10,1 + 32,95,10,1 --> 32,95,10,2
         
-        model_output = self.get_de_interpolated_rings(pred) #32,2,19,50 --> 32,378,2
-
-        return model_output #32,378,2
+        pred = y_reshaped.permute(0,3,1,2) #32,2,19,50 --> 32,19,50,2
+        model_prediction = self.get_de_interpolated_rings(pred) #32,2,19,50 --> 32,378,2
+        
+        return model_prediction #32,378,2
     
     
     def encoder_forward(self, x):
@@ -230,8 +294,3 @@ class SResTransformer(torch.nn.Module):
 
         return y_hat
         
-    
-
-
-    
-    
