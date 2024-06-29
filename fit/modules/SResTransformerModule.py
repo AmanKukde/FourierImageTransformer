@@ -157,7 +157,7 @@ class SResTransformerModule(LightningModule):
     def training_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch  #batch,tokens,2 #64,(27*14 = 378),2
         fc = fc[:, self.dst_flatten_order]
-        # fc = fc[:, :self.input_seq_length] = 0.
+        
         y_hat = self.sres.forward(fc)
 
         fc_loss, amp_loss, phi_loss, weighted_phi_loss = self.criterion(y_hat, fc, mag_min,mag_max)
@@ -183,19 +183,19 @@ class SResTransformerModule(LightningModule):
             torch.tensor([x['weighted_phi_loss'] for x in self.train_outputs_list]))
         
         self.log('Train/train_mean_epoch_loss',
-                 loss.to('cuda'),
+                 loss,
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_amp_loss',
-                 amp_loss.to('cuda'),
+                 amp_loss,
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_phi_loss',
-                 phi_loss.to('cuda'),
+                 phi_loss,
                  logger=True,
                  on_epoch=True)
         self.log('Train/train_mean_epoch_weighted_phi_loss',
-                 weighted_phi_loss.to('cuda'),
+                 weighted_phi_loss,
                  logger=True,
                  on_epoch=True)
         
@@ -227,9 +227,9 @@ class SResTransformerModule(LightningModule):
     def validation_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
         fc = fc[:, self.dst_flatten_order]
-
-        y_hat = self.sres.forward_i(fc)
-
+        lr = fc[:,:self.input_seq_length]
+        
+        y_hat = self.sres.forward_i(lr)
         
         val_loss, amp_loss, phi_loss,weighted_phi_loss= self.criterion(y_hat, fc, mag_min,
                                                       mag_max)
@@ -262,11 +262,11 @@ class SResTransformerModule(LightningModule):
 
     def on_validation_epoch_end(self):
         val_loss = torch.mean(
-            torch.tensor([x['val_loss'] for x in self.val_outputs_list])).to('cuda')
+            torch.tensor([x['val_loss'] for x in self.val_outputs_list]))
         val_amp_loss = torch.mean(
-            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list])).to('cuda')
+            torch.tensor([x['val_amp_loss'] for x in self.val_outputs_list]))
         val_phi_loss = torch.mean(
-            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list])).to('cuda')
+            torch.tensor([x['val_phi_loss'] for x in self.val_outputs_list]))
 
         self.log('Validation/avg_val_loss',
                  torch.mean(val_loss),
@@ -307,7 +307,7 @@ class SResTransformerModule(LightningModule):
 
     def test_step(self, batch, batch_idx):
         fc, (mag_min, mag_max) = batch
-        fc = fc[:, self.dst_flatten_order].to('cuda')
+        fc = fc[:, self.dst_flatten_order]
         
         lowres_img, pred_img, gt_img = self.predict_and_get_lowres_pred_gt(
             fc, mag_min, mag_max)
@@ -348,11 +348,8 @@ class SResTransformerModule(LightningModule):
                                 dim=[1, 2])
 
     def predict_and_get_lowres_pred_gt(self, fc, mag_min, mag_max):
-        fc = fc.to('cuda')
-        mag_min = mag_min.to('cuda')
-        mag_max = mag_max.to('cuda')
-        fc = fc[:, self.dst_flatten_order]
-        pred = self.sres.forward_i(fc)#, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
+        
+        pred = self.sres.forward_i(fc[:,:self.input_seq_length])#, max_seq_length= self.dft_shape[1] * 2 * self.interpolation_size //10)
         lowres_img, pred_img, gt_img = self.get_lowres_pred_gt(
             fc, pred, mag_min, mag_max)
         return lowres_img, pred_img, gt_img
@@ -363,9 +360,11 @@ class SResTransformerModule(LightningModule):
         )  #no need for [dst_flatten_order] as x_fc was made that way
         lowres = fc.clone()
         lowres[:, :self.input_seq_length] = 0.
+        
         lowres_img = self.convert2img(fc=lowres,
                                       mag_min=mag_min,
                                       mag_max=mag_max)
+        
         gt_img = self.convert2img(fc=fc,
                                   mag_min=mag_min,
                                   mag_max=mag_max)

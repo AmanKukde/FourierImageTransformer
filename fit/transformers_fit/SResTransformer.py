@@ -72,10 +72,10 @@ class SResTransformer(torch.nn.Module):
                 value_dimensions=d_query,
                 dropout=dropout,
                 attention_dropout=attention_dropout
-            ).get() 
+            ).get()
 
 
-        self.encoder.to('cuda')
+
         
         self.predictor_amp = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors))
         self.predictor_phase = torch.nn.Sequential(torch.nn.Linear(d_model//2,d_model), torch.nn.ReLU(), torch.nn.Linear(d_model,d_model//2),torch.nn.ReLU(), torch.nn.Linear(d_model//2,d_model//4),torch.nn.ReLU(),torch.nn.Linear(d_model//4,self.no_of_sectors))
@@ -96,15 +96,13 @@ class SResTransformer(torch.nn.Module):
             r = 0
             selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
             permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]  
-            interpolated_fc = interpolate(selected_ring,self.interpolation_size, mode = 'nearest-exact').unsqueeze(2)
+            interpolated_fc = interpolate(selected_ring,self.interpolation_size, mode = 'linear').unsqueeze(2)
 
             for r in list(self.fc_per_ring.keys())[1:]:
-                try:
-                    selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
-                    permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]  
-                    interpolated_fc = torch.cat([interpolated_fc,interpolate(selected_ring,self.interpolation_size, mode = 'nearest-exact').unsqueeze(2)], axis = 2)
-                except:
-                    pass
+                selected_ring = permuted_fc[:,:,:self.fc_per_ring[r]]
+                permuted_fc = permuted_fc[:,:,self.fc_per_ring[r]:]
+                if selected_ring.shape[2] != 0:
+                    interpolated_fc = torch.cat([interpolated_fc,interpolate(selected_ring,self.interpolation_size, mode = 'linear').unsqueeze(2)], axis = 2)
             return interpolated_fc
 
     def get_largest_semicircle(self,interpolated_fc):
@@ -134,7 +132,6 @@ class SResTransformer(torch.nn.Module):
         #interpolation size is what i want all my rings to be, alsoa already a multiple of *no-of-sectors
         #highres_input.shape = 32,2,19,50
         lowres_input = highres_input[:,:,:shells,:]
-        # lowres_input = highres_input[:,:,:s,:]
         lowres_input = lowres_input.permute(0,2,3,1) 
         return lowres_input #(32,6,50,2) ; (8, 5, 110, 2)
     
@@ -231,7 +228,7 @@ class SResTransformer(torch.nn.Module):
         final_output = []
         # for r in self.fc_per_ring.keys():
         for r in range(output.shape[2]):
-            final_output.append(interpolate(output[:,:,r,:],self.fc_per_ring[r], mode ="nearest-exact"))
+            final_output.append(interpolate(output[:,:,r,:],self.fc_per_ring[r], mode ="linear"))
         final_output = torch.cat(final_output,dim = -1).permute(0,2,1) #batch,378,2  
         return final_output
     

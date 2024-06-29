@@ -3,7 +3,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=aman.kukde@visitors.fht.org
 #SBATCH --partition=gpuq
-#SBATCH --time=06-00:00:00
+#SBATCH --time=07-00:00:00
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=2
 #SBATCH --gpus-per-node=2
