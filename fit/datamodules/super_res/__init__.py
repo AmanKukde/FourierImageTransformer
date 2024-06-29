@@ -1,2 +1,2 @@
 from .SResFCDataset import SResFourierCoefficientDataset
-from .SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM, BioSRMicrotubules, Omniglot, MNIST_SResFITDM_Large
+from .SResDataModule import MNIST_SResFITDM, CelebA_SResFITDM

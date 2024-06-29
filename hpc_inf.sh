@@ -4,7 +4,7 @@
 remote_user="aman.kukde"
 remote_host="hpclogin.fht.org"
 # remote_script_path="~/Projects/FourierImageTransformer/bash"  # Path to the script on the remote server
-remote_script_path="~/batches"  # Path to the script on the remote server
+remote_script_path="~/Projects/main/FourierImageTransformer/"  # Path to the script on the remote server
 
 # Local variables
 bash_script="inference.sbatch"  # Name of your bash script

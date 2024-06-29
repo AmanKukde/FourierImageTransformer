@@ -1,11 +1,9 @@
 import sys
-
-from sklearn import model_selection
 sys.path.append('../')
 from fit.datamodules.super_res import MNIST_SResFITDM, CelebA_SResFITDM
 from fit.utils.tomo_utils import get_polar_rfft_coords_2D
 from fit.modules.SResTransformerModule import SResTransformerModule
-
+import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,15 +22,16 @@ import matplotlib.pyplot as plt
 
 class Inference:
 
-    def __init__(self, ckpt_path_list=[], save_folder = '../'):
+    def __init__(self,ckpt_path_list=[],shells = 5):
         self.ckpt_path_list = ckpt_path_list
-        self.save_folder = save_folder
+        # self.save_folder = save_folder
+        self.shells = shells
 
     def run_inference(self):
         for path in self.ckpt_path_list:
             model_type, model, loss, dataset, dm, flatten_order,model_created = self._load_model_from_ckpt_path(
                 ckpt_path=path)
-            save_loc = self.save_folder + f"/{model_type}_{dataset}/{loss}/{model_created}/{datetime.datetime.now().strftime('%m_%d_%H_%M')}"
+            save_loc = '/group/jug/Aman/Inference/' + model_type +'/' + model_created + '/'+ loss + '/'+ dataset + '/'+ str(self.shells) + '/' + datetime.datetime.now().strftime("%d_%m-%H_%M_%S") + '/'
             Path(save_loc).mkdir(parents=True, exist_ok=True)
                 
             self.test_model_save_pred_psnr(
@@ -53,7 +52,7 @@ class Inference:
 
         if dataset == "MNIST":
             dm = MNIST_SResFITDM(root_dir="./datamodules/data/",
-                                 batch_size=32,
+                                 batch_size=256,
                                  subset_flag=False)
         if dataset == "CelebA":
             dm = CelebA_SResFITDM(root_dir="./datamodules/data/",
@@ -75,7 +74,7 @@ class Inference:
                                       n_layers=8,
                                       n_heads=n_heads,
                                       d_query=d_query,
-                                      num_shells=5,
+                                      num_shells=self.shells,
                                       model_type=model_type)
 
         weights = torch.load(ckpt_path)['state_dict']
@@ -268,10 +267,13 @@ class Inference:
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--ckpt_path", type=str, help="Path to the checkpoint", default="")
-    parser.add_argument("--save_folder", type=str, help="Folder to save the results", default="./inference_results/")
-    args = parser.parse_args()
-    Inference = Inference(ckpt_path_list = [args.ckpt_path],save_folder = args.save_folder)
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--ckpt_path", type=str, help="Path to the checkpoint", default="")
+    # parser.add_argument("--save_folder", type=str, help="Folder to save the results", default="./inference_results/")
+    # args = parser.parse_args()
+    # pdb.set_trace()
+    ckpt_path_list = ['/group/jug/Aman/Trained_Models/MNIST/mamba/sum/Mamba_MNIST_wp_1000_sum_L_8_H_8_s_10_subset_False_SectorEncoder_NSec10_02-06_12-56-56/epoch=996-step=857420.ckpt','/group/jug/Aman/Trained_Models/MNIST/fast/sum/Fast_MNIST_wp_1000_sum_L_8_H_8_s_10_subset_False_SectorEncoder_NSec10_01-06_16-28-04/epoch=999-step=1719000.ckpt']
+    Inference = Inference(ckpt_path_list = ckpt_path_list)
+    # Inference = Inference(ckpt_path_list = [args.ckpt_path],save_folder = args.save_folder)
     Inference.run_inference()
 
